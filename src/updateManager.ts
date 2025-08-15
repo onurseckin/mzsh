@@ -1,8 +1,8 @@
 /**
- * Update Manager Module for zshrc-manager
- *
+ * Update Manager Module for mzsh
+ * 
  * This module handles the complex process of updating and reinstalling the
- * zshrc-manager tool. It implements a sophisticated project detection system
+ * mzsh tool. It implements a sophisticated project detection system
  * and orchestrates the update process through shell scripts.
  *
  * Key features:
@@ -24,9 +24,9 @@ import * as os from 'os';
 import * as path from 'path';
 
 /**
- * UpdateManager - Handles update and reinstallation operations
- *
- * This class manages the complex process of updating zshrc-manager installations.
+  * UpdateManager - Handles update and reinstallation operations
+ * 
+ * This class manages the complex process of updating mzsh installations.
  * It implements multiple strategies for locating the project files and provides
  * comprehensive error handling for various edge cases.
  *
@@ -64,7 +64,7 @@ export class UpdateManager {
    */
   async runUpdate(): Promise<void> {
     // Phase 0: Initialize update process with user feedback
-    console.log(chalk.blue('🔄 Starting zshrc-manager update...'));
+    console.log(chalk.blue('🔄 Starting mzsh update...'));
     console.log('');
 
     // Phase 1: Project Detection
@@ -112,23 +112,23 @@ export class UpdateManager {
    * - Explanation of why project files are required
    */
   private showProjectNotFoundError(): void {
-    console.error(chalk.red('❌ Error: Could not find zshrc-manager project directory'));
+          console.error(chalk.red('❌ Error: Could not find mzsh project directory'));
     console.error('');
     console.error(chalk.yellow('This can happen in two scenarios:'));
     console.error('');
 
     // Scenario 1: Project was deleted after installation
     console.error(chalk.blue('1. You deleted the project folder after installation:'));
-    console.error('   • You need to re-download/clone the zshrc-manager project');
-    console.error('   • Git clone: git clone <repository-url> zshrc-manager');
-    console.error('   • Then navigate to the project: cd zshrc-manager');
+    console.error('   • You need to re-download/clone the mzsh project');
+    console.error('   • Git clone: git clone <repository-url> mzsh');
+    console.error('   • Then navigate to the project: cd mzsh');
     console.error('   • Run the update: mzsh --update');
     console.error('');
 
     // Scenario 2: User is in wrong directory
     console.error(chalk.blue('2. You are not in the project directory:'));
-    console.error('   • Navigate to where you originally downloaded zshrc-manager');
-    console.error('   • Look for a folder containing package.json with "zshrc-manager"');
+    console.error('   • Navigate to where you originally downloaded mzsh');
+    console.error('   • Look for a folder containing package.json with "mzsh"');
     console.error('   • cd into that directory and run: mzsh --update');
     console.error('');
 
@@ -142,9 +142,9 @@ export class UpdateManager {
     // System commands to locate existing projects
     console.error(chalk.blue('To find existing project on your system:'));
     console.error(
-      '   • Search: find ~ -name "package.json" -exec grep -l "zshrc-manager" {} \\; 2>/dev/null'
+      '   • Search: find ~ -name "package.json" -exec grep -l "mzsh" {} \\; 2>/dev/null'
     );
-    console.error('   • Or: locate package.json | xargs grep -l "zshrc-manager" 2>/dev/null');
+    console.error('   • Or: locate package.json | xargs grep -l "mzsh" 2>/dev/null');
     console.error('');
 
     // Explanation of requirement
@@ -152,7 +152,7 @@ export class UpdateManager {
   }
 
   /**
-   * Locate the zshrc-manager project root directory
+   * Locate the mzsh project root directory
    *
    * This method implements a comprehensive search strategy to find the
    * project directory containing the update scripts. It uses multiple
@@ -185,8 +185,8 @@ export class UpdateManager {
       if (await fs.pathExists(packageJsonPath)) {
         try {
           const packageJson = await fs.readJson(packageJsonPath);
-          // Validate this is actually the zshrc-manager project
-          if (packageJson.name === 'zshrc-manager') {
+          // Validate this is actually the mzsh project
+          if (packageJson.name === 'mzsh') {
             return currentDir;
           }
         } catch {
@@ -218,7 +218,7 @@ export class UpdateManager {
         try {
           const packageJson = await fs.readJson(packageJsonPath);
           // Validate this is the correct project
-          if (packageJson.name === 'zshrc-manager') {
+          if (packageJson.name === 'mzsh') {
             return currentDir;
           }
         } catch {
@@ -239,11 +239,11 @@ export class UpdateManager {
     // Check typical locations where developers store projects
     // This handles cases where the project is in a standard location
     const commonPaths = [
-      path.join(os.homedir(), 'zshrc-manager'), // ~/zshrc-manager
-      path.join(os.homedir(), 'repos', 'zshrc-manager'), // ~/repos/zshrc-manager
-      path.join(os.homedir(), 'projects', 'zshrc-manager'), // ~/projects/zshrc-manager
-      path.join(os.homedir(), 'dev', 'zshrc-manager'), // ~/dev/zshrc-manager
-      path.join(os.homedir(), 'Downloads', 'zshrc-manager'), // ~/Downloads/zshrc-manager
+      path.join(os.homedir(), 'mzsh'), // ~/mzsh
+      path.join(os.homedir(), 'repos', 'mzsh'), // ~/repos/mzsh
+      path.join(os.homedir(), 'projects', 'mzsh'), // ~/projects/mzsh
+      path.join(os.homedir(), 'dev', 'mzsh'), // ~/dev/mzsh
+      path.join(os.homedir(), 'Downloads', 'mzsh'), // ~/Downloads/mzsh
     ];
 
     // Check each common location
@@ -255,7 +255,7 @@ export class UpdateManager {
         try {
           const packageJson = await fs.readJson(packageJsonPath);
           // Validate this is the correct project
-          if (packageJson.name === 'zshrc-manager') {
+          if (packageJson.name === 'mzsh') {
             return commonPath;
           }
         } catch {

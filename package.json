@@ -1,5 +1,5 @@
 {
-  "name": "zshrc-manager",
+  "name": "mzsh",
   "version": "1.0.0",
   "module": "index.ts",
   "type": "commonjs",

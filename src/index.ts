@@ -1,5 +1,5 @@
 /**
- * Main entry point for the zshrc-manager CLI application.
+ * Main entry point for the mzsh CLI application.
  *
  * This file serves as the orchestrator for the entire application, coordinating
  * between different modules to provide a cohesive user experience. It handles:
@@ -20,7 +20,7 @@ import { type OpenType, getAvailableOpenTypes, getOpenConfig, isValidOpenType } 
 import { UpdateManager } from './updateManager';
 
 /**
- * ZshrcManager - Main command class for the zshrc-manager CLI tool
+ * ZshrcManager - Main command class for the mzsh CLI tool
  *
  * This class serves as the primary entry point and orchestrator for all functionality.
  * It handles command-line parsing, flag validation, and delegates specific tasks
@@ -186,15 +186,15 @@ export default class ZshrcManager extends Command {
     console.log('OPTIONS');
     console.log('  -o, --open-type <type>  How to open the selected file');
     console.log(`                          Options: ${getAvailableOpenTypes().join(', ')}`);
-    console.log('      --update            Update zshrc-manager to the latest version');
-    console.log('      --reinstall         Reinstall zshrc-manager (same as --update)');
+    console.log('      --update            Update mzsh to the latest version');
+    console.log('      --reinstall         Reinstall mzsh (same as --update)');
     console.log('  -h, --help              Show help');
     console.log('');
     console.log('EXAMPLES');
     console.log('  mzsh                    # Use default application');
     console.log('  mzsh -o vim            # Open with vim');
     console.log('  mzsh --open-type code  # Open with VS Code');
-    console.log('  mzsh --update          # Update zshrc-manager');
-    console.log('  mzsh --reinstall       # Reinstall zshrc-manager');
+    console.log('  mzsh --update          # Update mzsh');
+    console.log('  mzsh --reinstall       # Reinstall mzsh');
   }
 }

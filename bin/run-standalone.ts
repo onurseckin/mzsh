@@ -28,7 +28,7 @@ for (const path of possiblePaths) {
 }
 
 if (!commandPath) {
-  console.error('Error: Could not find zshrc-manager command files');
+  console.error('Error: Could not find mzsh command files');
   process.exit(1);
 }
 
@@ -43,7 +43,7 @@ try {
   }
 } catch (error: unknown) {
   const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-  console.error('Error loading zshrc-manager:', errorMessage);
+  console.error('Error loading mzsh:', errorMessage);
   process.exit(1);
 }
 

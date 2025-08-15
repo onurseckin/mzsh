@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Install zshrc-manager Script
-# This script installs the zshrc-manager package globally with comprehensive checks and logging
+# Install mzsh Script
+# This script installs the mzsh package globally with comprehensive checks and logging
 
 set -e
 
@@ -33,18 +33,18 @@ log_step() {
     echo -e "${BLUE}🔄 $1${NC}"
 }
 
-echo "🚀 Installing zshrc-manager globally..."
+echo "🚀 Installing mzsh globally..."
 echo ""
 
 # Step 1: Verify we're in the correct directory
 log_step "Step 1: Verifying project directory..."
 if [ ! -f "package.json" ]; then
-    log_error "package.json not found. This script must be run from the zshrc-manager project directory"
+    log_error "package.json not found. This script must be run from the mzsh project directory"
     exit 1
 fi
 
-if ! grep -q "zshrc-manager" package.json; then
-    log_error "This doesn't appear to be the zshrc-manager project directory"
+if ! grep -q "mzsh" package.json; then
+    log_error "This doesn't appear to be the mzsh project directory"
     exit 1
 fi
 
@@ -189,7 +189,7 @@ else
 fi
 
 echo ""
-log_success "🎉 zshrc-manager installation completed successfully!"
+log_success "🎉 mzsh installation completed successfully!"
 echo ""
 log_info "Usage examples:"
 echo "  mzsh                     # Use default application"
@@ -197,8 +197,8 @@ echo "  mzsh -o vim             # Open with vim"
 echo "  mzsh -o nano            # Open with nano"
 echo "  mzsh -o code            # Open with VS Code"
 echo "  mzsh --open-type subl   # Open with Sublime Text"
-echo "  mzsh --update           # Update zshrc-manager"
-echo "  mzsh --reinstall        # Reinstall zshrc-manager"
+echo "  mzsh --update           # Update mzsh"
+echo "  mzsh --reinstall        # Reinstall mzsh"
 echo ""
 log_info "Package manager scripts:"
 echo "  bun run inst            # Install globally"

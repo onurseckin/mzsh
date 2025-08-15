@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Uninstall zshrc-manager Script
-# This script removes the zshrc-manager package from global installation with comprehensive checks and logging
+# Uninstall mzsh Script
+# This script removes the mzsh package from global installation with comprehensive checks and logging
 
 set -e
 
@@ -33,7 +33,7 @@ log_step() {
     echo -e "${BLUE}🔄 $1${NC}"
 }
 
-echo "🗑️  Uninstalling zshrc-manager..."
+echo "🗑️  Uninstalling mzsh..."
 echo ""
 
 # Step 1: Check if mzsh command exists
@@ -58,13 +58,13 @@ fi
 
 # Step 3: Remove npm global installation
 log_step "Step 3: Checking for npm global installation..."
-if npm list -g zshrc-manager >/dev/null 2>&1; then
+if npm list -g mzsh >/dev/null 2>&1; then
     log_info "Found npm global installation, removing..."
-    if npm uninstall -g zshrc-manager 2>/dev/null; then
+    if npm uninstall -g mzsh 2>/dev/null; then
         log_success "npm global installation removed"
     else
         log_error "Failed to remove npm global installation"
-        log_info "You may need to run: sudo npm uninstall -g zshrc-manager"
+                    log_info "You may need to run: sudo npm uninstall -g mzsh"
     fi
 else
     log_info "No npm global installation found"
@@ -107,9 +107,9 @@ log_step "Step 5: Checking for remaining directories..."
 
 # Common directories where packages might be installed
 POSSIBLE_DIRS=(
-    "$HOME/.bun/install/global/node_modules/zshrc-manager"
-    "$HOME/.npm-global/lib/node_modules/zshrc-manager"
-    "/usr/local/lib/node_modules/zshrc-manager"
+    "$HOME/.bun/install/global/node_modules/mzsh"
+    "$HOME/.npm-global/lib/node_modules/mzsh"
+    "/usr/local/lib/node_modules/mzsh"
 )
 
 DIRS_REMOVED=0
@@ -153,7 +153,7 @@ fi
 # Step 7: Clean up any remaining configuration
 log_step "Step 7: Checking for configuration cleanup..."
 
-# Check if there are any zshrc-manager related entries in shell configs
+# Check if there are any mzsh related entries in shell configs
 SHELL_CONFIGS=(
     "$HOME/.zshrc"
     "$HOME/.bashrc"
@@ -164,8 +164,8 @@ SHELL_CONFIGS=(
 CONFIG_WARNINGS=0
 
 for config in "${SHELL_CONFIGS[@]}"; do
-    if [ -f "$config" ] && grep -q "zshrc-manager\|\.bun/bin.*zshrc" "$config" 2>/dev/null; then
-        log_warning "Found zshrc-manager references in: $config"
+    if [ -f "$config" ] && grep -q "mzsh\|\.bun/bin.*mzsh" "$config" 2>/dev/null; then
+        log_warning "Found mzsh references in: $config"
         log_info "You may want to manually review and clean up this file"
         ((CONFIG_WARNINGS++))
     fi
@@ -179,7 +179,7 @@ else
 fi
 
 echo ""
-log_success "🎉 zshrc-manager uninstallation completed!"
+log_success "🎉 mzsh uninstallation completed!"
 echo ""
 
 # Final status summary
@@ -196,5 +196,5 @@ if [ $CONFIG_WARNINGS -gt 0 ]; then
 fi
 
 echo ""
-log_success "zshrc-manager has been successfully uninstalled from your system!"
+log_success "mzsh has been successfully uninstalled from your system!"
 echo ""
