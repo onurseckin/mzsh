@@ -1,0 +1,55 @@
+{
+  "name": "zshrc-manager",
+  "version": "1.0.0",
+  "module": "index.ts",
+  "type": "commonjs",
+  "private": false,
+  "bin": {
+    "zshrc": "./bin/run-standalone.ts"
+  },
+  "scripts": {
+    "build": "bun run clean && tsc && bun build lib/commands/index.js --outdir dist --target bun --minify",
+    "build:dev": "bun run clean && tsc && bun build lib/commands/index.js --outdir dist --target bun",
+    "build:ts": "tsc",
+    "clean": "rm -rf dist lib",
+    "prebuild": "bun run clean",
+    "install-global": "bun link",
+    "uninstall-global": "bun unlink",
+    "start": "bun run bin/run.ts",
+    "update": "./update-global.sh",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/fs-extra": "^11.0.4",
+    "@types/inquirer": "^9.0.9",
+    "@typescript-eslint/eslint-plugin": "^8.39.1",
+    "@typescript-eslint/parser": "^8.39.1",
+    "eslint": "^9.33.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.4",
+    "jiti": "^2.5.1",
+    "prettier": "^3.6.2"
+  },
+  "peerDependencies": {
+    "typescript": "^5.9.2"
+  },
+  "oclif": {
+    "bin": "zshrc",
+    "dirname": "zshrc",
+    "commands": "./lib",
+    "plugins": [
+      "@oclif/plugin-help"
+    ]
+  },
+  "dependencies": {
+    "@oclif/core": "^4.5.2",
+    "@oclif/plugin-help": "^6.2.32",
+    "chalk": "^5.5.0",
+    "fs-extra": "^11.3.1",
+    "inquirer": "^12.9.2"
+  }
+}
