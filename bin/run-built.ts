@@ -9,7 +9,7 @@ const __filename: string = fileURLToPath(import.meta.url);
 const __dirname: string = dirname(__filename);
 const projectRoot: string = join(__dirname, '..');
 const builtFile: string = join(projectRoot, 'dist', 'index.js');
-const sourceFile: string = join(projectRoot, 'src', 'commands', 'index.ts');
+const sourceFile: string = join(projectRoot, 'src', 'index.ts');
 
 interface ZshrcManagerConstructor {
   new (

@@ -5,18 +5,18 @@
   "type": "commonjs",
   "private": false,
   "bin": {
-    "zshrc": "./bin/run-standalone.ts"
+    "mzsh": "./bin/run-standalone.ts"
   },
   "scripts": {
-    "build": "bun run clean && tsc && bun build lib/commands/index.js --outdir dist --target bun --minify",
-    "build:dev": "bun run clean && tsc && bun build lib/commands/index.js --outdir dist --target bun",
+    "build": "bun run clean && tsc && bun build lib/index.js --outdir dist --target bun --minify",
+    "build:dev": "bun run clean && tsc && bun build lib/index.js --outdir dist --target bun",
     "build:ts": "tsc",
     "clean": "rm -rf dist lib",
     "prebuild": "bun run clean",
-    "install-global": "bun link",
-    "uninstall-global": "bun unlink",
+    "inst": "./install.sh",
+    "uninst": "./uninstall.sh",
     "start": "bun run bin/run.ts",
-    "update": "./update-global.sh",
+    "update": "./uninstall.sh && ./install.sh",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
@@ -38,8 +38,8 @@
     "typescript": "^5.9.2"
   },
   "oclif": {
-    "bin": "zshrc",
-    "dirname": "zshrc",
+    "bin": "mzsh",
+    "dirname": "mzsh",
     "commands": "./lib",
     "plugins": [
       "@oclif/plugin-help"
