@@ -16,7 +16,9 @@ import { Command, Flags } from '@oclif/core';
 import chalk from 'chalk';
 import { FileDiscovery } from './fileDiscovery';
 import { InteractiveMenu } from './interactiveMenu';
+import { appMessages, formatMessage } from './messages';
 import { type OpenType, getAvailableOpenTypes, getOpenConfig, isValidOpenType } from './openConfig';
+import { SelfUninstaller } from './selfUninstaller';
 import { UpdateManager } from './updateManager';
 
 /**
@@ -44,6 +46,7 @@ export default class ZshrcManager extends Command {
     '<%= config.bin %> <%= command.id %> --open-type code',
     '<%= config.bin %> <%= command.id %> --update',
     '<%= config.bin %> <%= command.id %> --reinstall',
+    '<%= config.bin %> <%= command.id %> --uninst',
   ];
 
   /**
@@ -63,6 +66,9 @@ export default class ZshrcManager extends Command {
     reinstall: Flags.boolean({
       description: 'Reinstall zshrc-manager (same as --update)',
     }),
+    uninst: Flags.boolean({
+      description: 'Uninstall mzsh from the system',
+    }),
   };
 
   /**
@@ -71,6 +77,7 @@ export default class ZshrcManager extends Command {
    */
   private fileDiscovery = new FileDiscovery(); // Handles finding zsh config files
   private interactiveMenu = new InteractiveMenu(); // Manages user interaction and file selection
+  private selfUninstaller = new SelfUninstaller(); // Handles self-uninstallation
   private updateManager = new UpdateManager(); // Handles update/reinstall operations
 
   /**
@@ -93,6 +100,7 @@ export default class ZshrcManager extends Command {
       // Initialize default values for command processing
       let openType: OpenType = 'default';
       let shouldUpdate = false;
+      let shouldUninstall = false;
 
       // Dual-mode argument parsing: OCLIF vs Standalone
       if (this.config && typeof this.config.runHook === 'function') {
@@ -101,6 +109,7 @@ export default class ZshrcManager extends Command {
         const { flags } = await this.parse(ZshrcManager);
         openType = flags['open-type'] as OpenType;
         shouldUpdate = flags.update || flags.reinstall;
+        shouldUninstall = flags.uninst;
       } else {
         // STANDALONE MODE: Manual argument parsing for maximum compatibility
         // This allows the tool to work even when OCLIF framework isn't fully loaded
@@ -108,6 +117,9 @@ export default class ZshrcManager extends Command {
 
         // Check for update operations first (they don't require file discovery)
         shouldUpdate = args.includes('--update') || args.includes('--reinstall');
+
+        // Check for uninstall operation
+        shouldUninstall = args.includes('--uninst');
 
         // Handle help requests manually in standalone mode
         if (args.includes('--help') || args.includes('-h')) {
@@ -122,9 +134,13 @@ export default class ZshrcManager extends Command {
           if (providedType && isValidOpenType(providedType)) {
             openType = providedType;
           } else {
-            // Provide helpful error message with available options
+            // Use centralized error message
             console.error(
-              `Invalid open type: ${providedType}. Available options: ${getAvailableOpenTypes().join(', ')}`
+              formatMessage.error(
+                appMessages.errors.invalidOpenType.message,
+                appMessages.errors.invalidOpenType.action,
+                appMessages.errors.invalidOpenType.code
+              )
             );
             process.exit(1);
           }
@@ -133,20 +149,32 @@ export default class ZshrcManager extends Command {
 
       // ROUTING: Determine which functionality to execute
 
-      // Route 1: Update/Reinstall Operations
+      // Route 1: Uninstall Operations
+      if (shouldUninstall) {
+        await this.selfUninstaller.runUninstall();
+        return;
+      }
+
+      // Route 2: Update/Reinstall Operations
       if (shouldUpdate) {
         await this.updateManager.runUpdate();
         return;
       }
 
-      // Route 2: File Management Operations
+      // Route 3: File Management Operations
 
       // Step 1: Discover available zsh configuration files
       const files = await this.fileDiscovery.discoverZshFiles();
 
       // Handle case where no configuration files are found
       if (files.length === 0) {
-        console.log(chalk.yellow('No zsh configuration files found.'));
+        console.error(
+          formatMessage.error(
+            appMessages.errors.noConfigFiles.message,
+            appMessages.errors.noConfigFiles.action,
+            appMessages.errors.noConfigFiles.code
+          )
+        );
         return;
       }
 
@@ -178,23 +206,22 @@ export default class ZshrcManager extends Command {
    * - Practical examples for common use cases
    */
   private showHelp(): void {
-    console.log('Interactive zsh configuration file manager');
+    console.log(appMessages.help.description);
     console.log('');
     console.log('USAGE');
-    console.log('  mzsh [OPTIONS]');
+    console.log(`  ${appMessages.help.usage}`);
     console.log('');
     console.log('OPTIONS');
-    console.log('  -o, --open-type <type>  How to open the selected file');
+    console.log(`  ${appMessages.help.options.openType}`);
     console.log(`                          Options: ${getAvailableOpenTypes().join(', ')}`);
-    console.log('      --update            Update mzsh to the latest version');
-    console.log('      --reinstall         Reinstall mzsh (same as --update)');
-    console.log('  -h, --help              Show help');
+    console.log(`      ${appMessages.help.options.update}`);
+    console.log(`      ${appMessages.help.options.reinstall}`);
+    console.log(`      ${appMessages.help.options.uninst}`);
+    console.log(`  ${appMessages.help.options.help}`);
     console.log('');
     console.log('EXAMPLES');
-    console.log('  mzsh                    # Use default application');
-    console.log('  mzsh -o vim            # Open with vim');
-    console.log('  mzsh --open-type code  # Open with VS Code');
-    console.log('  mzsh --update          # Update mzsh');
-    console.log('  mzsh --reinstall       # Reinstall mzsh');
+    appMessages.help.examples.forEach((example) => {
+      console.log(`  ${example}`);
+    });
   }
 }

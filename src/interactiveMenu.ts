@@ -23,6 +23,40 @@ import * as path from 'path';
 import { ZshFile } from './fileDiscovery';
 import { type OpenType, openFileWithType } from './openConfig';
 
+// Custom prompt class that handles escape and backspace keys
+class CustomListPrompt extends inquirer.prompts.list {
+  constructor(questions: any, rl: any, answers: any) {
+    super(questions, rl, answers);
+
+    // Override key handling
+    this.onKeypress = this.onKeypress.bind(this);
+  }
+
+  onKeypress(keypress: any) {
+    // Handle escape key (ESC) or backspace
+    if (keypress.key && (keypress.key.name === 'escape' || keypress.key.name === 'backspace')) {
+      this.status = 'answered';
+      this.answer = '__quit__';
+      this.done(this.answer);
+      return;
+    }
+
+    // Handle 'q' key for quit
+    if (keypress.key && keypress.key.name === 'q') {
+      this.status = 'answered';
+      this.answer = '__quit__';
+      this.done(this.answer);
+      return;
+    }
+
+    // Call parent method for other keys
+    super.onKeypress(keypress);
+  }
+}
+
+// Register the custom prompt
+inquirer.registerPrompt('custom-list', CustomListPrompt);
+
 /**
  * InteractiveMenu - Manages user interaction for file selection and opening
  *
@@ -68,18 +102,52 @@ export class InteractiveMenu {
       short: file.name, // Brief name for confirmation display
     }));
 
-    // Configure and display the interactive selection menu
-    const { selectedFile } = await inquirer.prompt({
-      type: 'list', // List-style menu with arrow key navigation
-      name: 'selectedFile', // Property name for the result
-      message: chalk.cyan('Available zsh configuration files:'), // Colorized prompt
-      choices, // Menu options with formatting
-      pageSize: Math.min(files.length + 2, 15), // Responsive sizing (max 15 items)
-      loop: false, // Disable wrapping at list ends
+    // Add quit option at the end
+    choices.push({
+      name: chalk.red('✕ Quit'),
+      value: '__quit__',
+      short: 'Quit',
     });
 
-    // Process the user's selection by opening the chosen file
-    await this.openFile(selectedFile, openType);
+    try {
+      // Configure and display the interactive selection menu with custom key handling
+      const { selectedFile } = await inquirer.prompt({
+        type: 'custom-list', // Custom list with escape/backspace/q key handling
+        name: 'selectedFile', // Property name for the result
+        message: chalk.cyan('Available zsh configuration files (ESC/Backspace/q to quit):'), // Updated prompt
+        choices, // Menu options with formatting
+        pageSize: Math.min(files.length + 3, 15), // Responsive sizing (max 15 items, +1 for quit option)
+        loop: false, // Disable wrapping at list ends
+        // Custom theme for green highlighting of selected items
+        theme: {
+          style: {
+            answer: chalk.green,
+            message: chalk.cyan,
+            error: chalk.red,
+            defaultAnswer: chalk.dim,
+            help: chalk.dim,
+            highlight: chalk.green.bold, // Green highlighting for currently selected item
+            key: chalk.cyan.bold,
+          },
+        },
+      });
+
+      // Handle quit selection
+      if (selectedFile === '__quit__') {
+        console.log(chalk.yellow('Operation cancelled.'));
+        return;
+      }
+
+      // Process the user's selection by opening the chosen file
+      await this.openFile(selectedFile, openType);
+    } catch (error: any) {
+      // Handle user interruption (Ctrl+C, ESC, etc.)
+      if (error.name === 'ExitPromptError' || error.isTTYError) {
+        console.log(chalk.yellow('\nOperation cancelled.'));
+        return;
+      }
+      throw error;
+    }
   }
 
   /**

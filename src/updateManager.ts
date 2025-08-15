@@ -1,6 +1,6 @@
 /**
  * Update Manager Module for mzsh
- * 
+ *
  * This module handles the complex process of updating and reinstalling the
  * mzsh tool. It implements a sophisticated project detection system
  * and orchestrates the update process through shell scripts.
@@ -24,8 +24,8 @@ import * as os from 'os';
 import * as path from 'path';
 
 /**
-  * UpdateManager - Handles update and reinstallation operations
- * 
+ * UpdateManager - Handles update and reinstallation operations
+ *
  * This class manages the complex process of updating mzsh installations.
  * It implements multiple strategies for locating the project files and provides
  * comprehensive error handling for various edge cases.
@@ -112,7 +112,7 @@ export class UpdateManager {
    * - Explanation of why project files are required
    */
   private showProjectNotFoundError(): void {
-          console.error(chalk.red('❌ Error: Could not find mzsh project directory'));
+    console.error(chalk.red('❌ Error: Could not find mzsh project directory'));
     console.error('');
     console.error(chalk.yellow('This can happen in two scenarios:'));
     console.error('');
