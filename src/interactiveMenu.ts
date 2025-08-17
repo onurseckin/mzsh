@@ -18,44 +18,156 @@
  */
 
 import chalk from 'chalk';
-import inquirer from 'inquirer';
 import * as path from 'path';
+import * as readline from 'readline';
 import { ZshFile } from './fileDiscovery';
 import { type OpenType, openFileWithType } from './openConfig';
 
-// Custom prompt class that handles escape and backspace keys
-class CustomListPrompt extends inquirer.prompts.list {
-  constructor(questions: any, rl: any, answers: any) {
-    super(questions, rl, answers);
-
-    // Override key handling
-    this.onKeypress = this.onKeypress.bind(this);
-  }
-
-  onKeypress(keypress: any) {
-    // Handle escape key (ESC) or backspace
-    if (keypress.key && (keypress.key.name === 'escape' || keypress.key.name === 'backspace')) {
-      this.status = 'answered';
-      this.answer = '__quit__';
-      this.done(this.answer);
-      return;
-    }
-
-    // Handle 'q' key for quit
-    if (keypress.key && keypress.key.name === 'q') {
-      this.status = 'answered';
-      this.answer = '__quit__';
-      this.done(this.answer);
-      return;
-    }
-
-    // Call parent method for other keys
-    super.onKeypress(keypress);
-  }
+// Define types for better type safety
+interface Choice {
+  name: string;
+  value: string;
+  short: string;
 }
 
-// Register the custom prompt
-inquirer.registerPrompt('custom-list', CustomListPrompt);
+interface KeypressEvent {
+  name?: string;
+  ctrl?: boolean;
+  meta?: boolean;
+  shift?: boolean;
+}
+
+interface PromptOptions {
+  message: string;
+  choices: Choice[];
+  pageSize: number;
+  theme?: {
+    style?: {
+      answer?: typeof chalk.green;
+      message?: typeof chalk.cyan;
+      error?: typeof chalk.red;
+      defaultAnswer?: typeof chalk.dim;
+      help?: typeof chalk.dim;
+      highlight?: typeof chalk.green.bold;
+      key?: typeof chalk.cyan.bold;
+    };
+  };
+}
+
+// Custom prompt with enhanced key handling
+class CustomListPrompt {
+  private rl: readline.Interface;
+  private choices: Choice[];
+  private message: string;
+  private currentIndex: number = 0;
+  private pageSize: number;
+  private theme: PromptOptions['theme'];
+
+  constructor(options: PromptOptions) {
+    this.choices = options.choices || [];
+    this.message = options.message || '';
+    this.pageSize = options.pageSize || 10;
+    this.theme = options.theme || {};
+
+    this.rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+
+    // Enable keypress events
+    readline.emitKeypressEvents(process.stdin);
+    if (process.stdin.isTTY) {
+      process.stdin.setRawMode(true);
+    }
+  }
+
+  async run(): Promise<string> {
+    return new Promise((resolve, _reject) => {
+      this.render();
+
+      const onKeypress = (_str: string, key: KeypressEvent | null) => {
+        if (!key) return;
+
+        // Handle quit keys (escape, backspace, q)
+        if (key.name === 'escape' || key.name === 'backspace' || key.name === 'q') {
+          this.cleanup();
+          console.log(chalk.yellow('\nOperation cancelled.'));
+          process.exit(0);
+          return;
+        }
+
+        // Handle Ctrl+C
+        if (key.ctrl && key.name === 'c') {
+          this.cleanup();
+          console.log(chalk.yellow('\nOperation cancelled.'));
+          process.exit(0);
+          return;
+        }
+
+        // Handle arrow keys
+        if (key.name === 'up' || key.name === 'k') {
+          this.currentIndex = Math.max(0, this.currentIndex - 1);
+          this.render();
+        } else if (key.name === 'down' || key.name === 'j') {
+          this.currentIndex = Math.min(this.choices.length - 1, this.currentIndex + 1);
+          this.render();
+        }
+
+        // Handle enter/return
+        if (key.name === 'return' || key.name === 'enter') {
+          const selected = this.choices[this.currentIndex];
+          if (selected) {
+            this.cleanup();
+            console.log(); // Add newline after selection
+            resolve(selected.value);
+          }
+        }
+      };
+
+      process.stdin.on('keypress', onKeypress);
+    });
+  }
+
+  private render(): void {
+    // Clear previous output
+    readline.cursorTo(process.stdout, 0);
+    readline.clearScreenDown(process.stdout);
+
+    // Display message
+    console.log(this.message);
+
+    // Display choices
+    const startIndex = Math.max(0, this.currentIndex - Math.floor(this.pageSize / 2));
+    const endIndex = Math.min(this.choices.length, startIndex + this.pageSize);
+
+    for (let i = startIndex; i < endIndex; i++) {
+      const choice = this.choices[i];
+      const isSelected = i === this.currentIndex;
+
+      if (choice) {
+        if (isSelected) {
+          console.log(chalk.green.bold(`> ${choice.name}`));
+        } else {
+          console.log(`  ${choice.name}`);
+        }
+      }
+    }
+
+    // Move cursor up to the beginning
+    readline.moveCursor(process.stdout, 0, -(endIndex - startIndex + 1));
+  }
+
+  private cleanup(): void {
+    if (process.stdin.isTTY) {
+      process.stdin.setRawMode(false);
+    }
+    process.stdin.removeAllListeners('keypress');
+
+    // Clear the rendered content and move cursor to end
+    readline.cursorTo(process.stdout, 0);
+    readline.clearScreenDown(process.stdout);
+  }
+}
 
 /**
  * InteractiveMenu - Manages user interaction for file selection and opening
@@ -110,15 +222,11 @@ export class InteractiveMenu {
     });
 
     try {
-      // Configure and display the interactive selection menu with custom key handling
-      const { selectedFile } = await inquirer.prompt({
-        type: 'custom-list', // Custom list with escape/backspace/q key handling
-        name: 'selectedFile', // Property name for the result
-        message: chalk.cyan('Available zsh configuration files (ESC/Backspace/q to quit):'), // Updated prompt
-        choices, // Menu options with formatting
-        pageSize: Math.min(files.length + 3, 15), // Responsive sizing (max 15 items, +1 for quit option)
-        loop: false, // Disable wrapping at list ends
-        // Custom theme for green highlighting of selected items
+      // Use our custom prompt with enhanced key handling
+      const customPrompt = new CustomListPrompt({
+        message: chalk.cyan('Available zsh configuration files (ESC/Backspace/q/Ctrl+C to quit):'),
+        choices,
+        pageSize: Math.min(files.length + 3, 15),
         theme: {
           style: {
             answer: chalk.green,
@@ -126,27 +234,29 @@ export class InteractiveMenu {
             error: chalk.red,
             defaultAnswer: chalk.dim,
             help: chalk.dim,
-            highlight: chalk.green.bold, // Green highlighting for currently selected item
+            highlight: chalk.green.bold,
             key: chalk.cyan.bold,
           },
         },
       });
 
-      // Handle quit selection
+      const selectedFile = await customPrompt.run();
+
+      // Handle quit selection from the menu (clicking on the Quit option)
       if (selectedFile === '__quit__') {
         console.log(chalk.yellow('Operation cancelled.'));
-        return;
+        process.exit(0);
       }
 
       // Process the user's selection by opening the chosen file
       await this.openFile(selectedFile, openType);
-    } catch (error: any) {
-      // Handle user interruption (Ctrl+C, ESC, etc.)
-      if (error.name === 'ExitPromptError' || error.isTTYError) {
-        console.log(chalk.yellow('\nOperation cancelled.'));
-        return;
-      }
-      throw error;
+
+      // Exit the process after successfully opening the file
+      process.exit(0);
+    } catch (_error: unknown) {
+      // This catch block should rarely be reached since we handle exits directly
+      console.log(chalk.yellow('\nOperation cancelled.'));
+      process.exit(0);
     }
   }
 
