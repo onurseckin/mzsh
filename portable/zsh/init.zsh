@@ -9,6 +9,7 @@ fi
 typeset -a mzsh_init_owned_scalar_variables=(
   MZSH_PORTABLE_ZSH_INITIALIZED MZSH_PORTABLE_ZSH_VERSION
   MZSH_COMPLETION_OWNER MZSH_COMPLETION_INITIALIZED MZSH_OH_MY_ZSH_LOADED MZSH_NVM_POLICY
+  MZSH_HOMEBREW_EFFECTIVE_PREFIX
   ZSH ZSH_THEME ZSH_TMUX_CONFIG
   ZVM_INIT_MODE ZVM_LINE_INIT_MODE ZVM_INSERT_MODE_CURSOR ZVM_NORMAL_MODE_CURSOR
   ZVM_VISUAL_MODE_CURSOR ZVM_OPPEND_MODE_CURSOR ZVM_VI_HIGHLIGHT_FOREGROUND
@@ -24,6 +25,7 @@ typeset -a mzsh_init_owned_aliases=(rm del y ls tree weztermlua vim vi tldrconfi
 typeset -a mzsh_init_owned_functions=(
   mzsh_observe mzsh_path_add_shim mzsh_path_add_runtime mzsh_path_add_application mzsh_path_canonicalize
   mzsh_path_finalize mzsh_completion_add_directory mzsh_completion_initialize
+  mzsh_runtime_directory_mode mzsh_runtime_directory_owner mzsh_runtime_add_directory_entries
   mzsh_private_mode mzsh_private_owner zvm_after_init n
   _mzsh_history_cleaner_precmd_hook history-cleaner history-reload
   _mzsh_dburl_decode _mzsh_dburl_sensitive_key dburl _mzsh_ports_kill kk kka

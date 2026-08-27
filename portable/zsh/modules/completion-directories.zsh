@@ -6,8 +6,8 @@ function mzsh_completion_add_directory() {
   (( ${fpath[(Ie)$1]} )) || fpath+=("$1")
 }
 
-[[ -n ${MZSH_HOMEBREW_PREFIX:-} ]] && \
-  mzsh_completion_add_directory "$MZSH_HOMEBREW_PREFIX/share/zsh/site-functions"
+[[ -n ${MZSH_HOMEBREW_EFFECTIVE_PREFIX:-} ]] && \
+  mzsh_completion_add_directory "$MZSH_HOMEBREW_EFFECTIVE_PREFIX/share/zsh/site-functions"
 [[ -n ${MZSH_DOCKER_COMPLETION_DIR:-} ]] && \
   mzsh_completion_add_directory "$MZSH_DOCKER_COMPLETION_DIR"
 

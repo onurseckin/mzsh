@@ -42,7 +42,9 @@ function mzsh_path_finalize() {
   typeset -A seen=()
   typeset -a candidates=()
   typeset -a deduplicated=()
-  local candidate
+  local candidate mzsh_path_identity mzsh_path_display mzsh_path_index
+  local mzsh_path_shim_count=${#MZSH_PATH_SHIMS[@]}
+  local mzsh_path_runtime_count=${#MZSH_PATH_RUNTIMES[@]}
 
   candidates=(
     "${MZSH_PATH_SHIMS[@]}"
@@ -51,11 +53,20 @@ function mzsh_path_finalize() {
     "${(@s/:/)PATH}"
   )
 
-  for candidate in "${candidates[@]}"; do
-    candidate="$(mzsh_path_canonicalize "$candidate")"
-    [[ -n $candidate && -z ${seen[$candidate]:-} ]] || continue
-    seen[$candidate]=1
-    deduplicated+=("$candidate")
+  for (( mzsh_path_index = 1; mzsh_path_index <= ${#candidates[@]}; ++mzsh_path_index )); do
+    candidate="${candidates[$mzsh_path_index]}"
+    mzsh_path_identity="$(mzsh_path_canonicalize "$candidate")"
+    [[ -n $mzsh_path_identity && -z ${seen[$mzsh_path_identity]:-} ]] || continue
+    seen[$mzsh_path_identity]=1
+    if ((
+      mzsh_path_index > mzsh_path_shim_count &&
+        mzsh_path_index <= mzsh_path_shim_count + mzsh_path_runtime_count
+    )); then
+      mzsh_path_display="${candidate:a}"
+    else
+      mzsh_path_display="$mzsh_path_identity"
+    fi
+    deduplicated+=("$mzsh_path_display")
   done
 
   PATH="${(j.:.)deduplicated}"

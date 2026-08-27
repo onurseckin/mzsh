@@ -37,6 +37,7 @@ export const zshPath = discoveredZshPath;
 export function portableEnvironment(): Record<string, string | undefined> {
   return {
     ...process.env,
+    HOMEBREW_PREFIX: '',
     PNPM_HOME: '',
     MZSH_PNPM_GLOBAL_BIN: '',
     RUBY_HOME: '',
@@ -67,7 +68,7 @@ export function copyPortableRoot(fixture: string): string {
 
 export function injectBoundaryFailure(
   portableRoot: string,
-  boundary: 'path' | 'oh-my-zsh' | 'completion' | 'private'
+  boundary: 'path' | 'runtime-paths' | 'oh-my-zsh' | 'completion' | 'private'
 ): string {
   const modulePath = join(portableRoot, 'modules', `${boundary}.zsh`);
   const module = readFileSync(modulePath, 'utf8');

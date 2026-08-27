@@ -47,20 +47,21 @@ architecture-specific Homebrew default is assumed.
 
 ## Variables and tool policy
 
-| Variable                            | Purpose                                                                            |
-| ----------------------------------- | ---------------------------------------------------------------------------------- |
-| `MZSH_COMMAND_SHIM_DIR`             | Existing command-safety shim directory, registered first.                          |
-| `MZSH_HOMEBREW_PREFIX`              | Homebrew prefix used for `bin`, `sbin`, and its Zsh completion directory.          |
-| `MZSH_MACPORTS_PREFIX`              | Optional MacPorts prefix used for `bin` and `sbin`.                                |
-| `BUN_INSTALL`                       | Bun installation root.                                                             |
-| `NVM_DIR`                           | Existing NVM installation root.                                                    |
-| `CARGO_HOME`                        | Rust/Cargo root; defaults to the conventional home-relative location.              |
-| `ANDROID_HOME` / `ANDROID_SDK_ROOT` | Android SDK root; `ANDROID_HOME` wins when both are set.                           |
-| `MZSH_OH_MY_ZSH_ROOT`               | Optional Oh My Zsh root; defaults to `$HOME/.oh-my-zsh`.                           |
-| `MZSH_DOCKER_COMPLETION_DIR`        | Existing Docker completion directory to register before completion initialization. |
-| `MZSH_FZF_SHELL_DIR`                | Trusted local directory containing static FZF key bindings and completion files.   |
-| `MZSH_PRIVATE_ZSH`                  | Optional local private-file override.                                              |
-| `MZSH_OBSERVE=1`                    | Enables redacted diagnostics on stderr.                                            |
+| Variable                            | Purpose                                                                                     |
+| ----------------------------------- | ------------------------------------------------------------------------------------------- |
+| `MZSH_COMMAND_SHIM_DIR`             | Existing command-safety shim directory, registered first.                                   |
+| `MZSH_HOMEBREW_PREFIX`              | Homebrew prefix used for `bin`, `sbin`, completions, and existing stable runtime opt links. |
+| `HOMEBREW_PREFIX`                   | Standard Homebrew export used when no MZSH-specific prefix is configured.                   |
+| `MZSH_MACPORTS_PREFIX`              | Optional MacPorts prefix used for `bin` and `sbin`.                                         |
+| `BUN_INSTALL`                       | Bun installation root.                                                                      |
+| `NVM_DIR`                           | Existing NVM installation root.                                                             |
+| `CARGO_HOME`                        | Rust/Cargo root; defaults to the conventional home-relative location.                       |
+| `ANDROID_HOME` / `ANDROID_SDK_ROOT` | Android SDK root; `ANDROID_HOME` wins when both are set.                                    |
+| `MZSH_OH_MY_ZSH_ROOT`               | Optional Oh My Zsh root; defaults to `$HOME/.oh-my-zsh`.                                    |
+| `MZSH_DOCKER_COMPLETION_DIR`        | Existing Docker completion directory to register before completion initialization.          |
+| `MZSH_FZF_SHELL_DIR`                | Trusted local directory containing static FZF key bindings and completion files.            |
+| `MZSH_PRIVATE_ZSH`                  | Optional local private-file override.                                                       |
+| `MZSH_OBSERVE=1`                    | Enables redacted diagnostics on stderr.                                                     |
 
 NVM has the auditable policy `MZSH_NVM_POLICY=existing-installation-only`.
 Startup sources `nvm.sh` only when that file already exists. It never installs
@@ -70,6 +71,22 @@ existing loader provides `NVM_BIN`, that already-selected runtime is placed
 after safety shims and before Homebrew application paths. This lets an
 operator-managed NVM/LTS policy win interactive Node resolution while
 Homebrew's Node remains a dependency/fallback path.
+
+Runtime choices are host data, never executable shell configuration. MZSH
+uses `${XDG_CONFIG_HOME:-$HOME/.config}/mzsh/runtime-paths` (or
+`MZSH_RUNTIME_PATHS_DIRECTORY` for an isolated test) only when it is a regular
+current-user-owned non-symlink directory with exact mode `0700`. Inside it,
+the fixed generic entries `python`, `ruby`, `go`, `postgresql`, `java`, and
+`pnpm` may each be a directory symlink to an existing host-selected executable
+directory. Invalid, missing, regular-file, or broken entries are ignored; an
+unsafe root produces only a redacted diagnostic.
+
+The repository never reads, parses, sources, or evaluates this boundary. It
+adds the stable generic entry path after safety shims and an active NVM runtime
+but ahead of inherited operating-system tools. A local race can therefore
+change only a current-user-owned PATH directory target, never execute code
+during shell startup. MZSH does not call package managers, install software,
+query the network, or select a runtime version.
 
 ## Completion ownership
 

@@ -38,9 +38,11 @@ if (( mzsh_login_status != 0 )); then
   PATH="$mzsh_login_original_path"
   export PATH
   unset MZSH_PORTABLE_ZSH_LOGIN_INITIALIZED MZSH_LOGIN_LOADED_MODULES
-  unset MZSH_PATH_SHIMS MZSH_PATH_APPLICATIONS
+  unset MZSH_HOMEBREW_EFFECTIVE_PREFIX MZSH_PATH_SHIMS MZSH_PATH_RUNTIMES MZSH_PATH_APPLICATIONS
   for mzsh_login_function in mzsh_observe mzsh_path_add_shim mzsh_path_add_application \
-    mzsh_path_canonicalize mzsh_path_finalize; do
+    mzsh_path_add_runtime mzsh_path_canonicalize mzsh_path_finalize \
+    mzsh_runtime_directory_mode mzsh_runtime_directory_owner \
+    mzsh_runtime_add_directory_entries; do
     (( $+functions[$mzsh_login_function] )) && unset -f "$mzsh_login_function"
   done
   unset mzsh_login_original_path mzsh_login_manifest_root mzsh_login_modules
