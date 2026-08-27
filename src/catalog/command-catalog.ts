@@ -104,9 +104,13 @@ const commands: readonly CatalogCommand[] = [
     name: 'setup',
     summary: 'Set up the managed MZSH lifecycle.',
     risk: 'destructive',
-    available: false,
+    available: true,
     palette: { keywords: ['setup', 'install'] },
-    parser: { kind: 'placeholder', flags: [], positional: 'none' },
+    parser: {
+      kind: 'setup',
+      flags: [applyFlag, planIdFlag, confirmFlag],
+      positional: 'none',
+    },
   },
   {
     name: 'history',
@@ -285,6 +289,16 @@ export function parseCatalogArgs(args: readonly string[]): CatalogParseResult {
         : { kind: 'env', action, name, json };
     }
     return { kind: 'usage-error', code: 'unexpected-positional' };
+  }
+  if (command.parser.kind === 'setup') {
+    return positionals.length === 0
+      ? {
+          kind: 'setup',
+          apply,
+          ...(typeof planId === 'string' ? { planId } : {}),
+          ...(typeof confirmation === 'string' ? { confirmation } : {}),
+        }
+      : { kind: 'usage-error', code: 'unexpected-positional' };
   }
   if (command.parser.kind === 'bootstrap') {
     if (positionals.length > 0) return { kind: 'usage-error', code: 'unexpected-positional' };

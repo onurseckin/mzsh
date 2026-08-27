@@ -26,6 +26,7 @@ import { readMachineManifest } from '../infrastructure/manifest-reader';
 import { ZshPreflight } from '../infrastructure/zsh-preflight';
 import { parseArguments } from './parse-arguments';
 import { runEnvironmentCommand } from './environment-command';
+import { runSetupCommand } from './setup-command';
 
 type PreflightResult =
   | { kind: 'passed' }
@@ -62,6 +63,7 @@ export interface RunMzshCliDependencies {
   apply?: typeof applyAdoption;
   rollback?: typeof rollbackAdoption;
   rollbackStateDigest?: typeof rollbackStateDigest;
+  setup?: import('../application/setup-service').SetupService;
 }
 
 function defaultInventoryCollector(): InventoryCollector {
@@ -167,6 +169,7 @@ export function runMzshCli(args: readonly string[], dependencies: RunMzshCliDepe
     return 2;
   }
   if (parsed.kind === 'env') return runEnvironmentCommand(parsed, dependencies);
+  if (parsed.kind === 'setup') return runSetupCommand(parsed, dependencies);
   const filesystem = dependencies.filesystem ?? new NodeAdoptionFilesystem();
   if (parsed.kind === 'audit') {
     const repositoryRoot = parsed.source ?? dependencies.repositoryRoot;

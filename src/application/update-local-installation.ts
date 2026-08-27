@@ -1,4 +1,14 @@
 import type { LocalInstallationUpdate, RepositoryState } from '../domain/repository-state';
+import type { UpdateResult } from '../domain/setup';
+
+export type { UpdateResult } from '../domain/setup';
+
+export function blockedLocalInstallationUpdate(
+  state: RepositoryState
+): Extract<UpdateResult, { kind: 'blocked' }> | undefined {
+  if (state.kind === 'present') return undefined;
+  return { kind: 'blocked', code: 'REPOSITORY_INVALID' };
+}
 
 export function planLocalInstallationUpdate(state: RepositoryState): LocalInstallationUpdate {
   if (state.kind === 'present') {

@@ -33,7 +33,7 @@ describe('Commander catalog adapter', () => {
     expect(adapter.help('rollback')).toContain('Risk: destructive');
   });
 
-  test('returns an unavailable placeholder before accessing managed command dependencies', () => {
+  test('returns an unavailable history placeholder before accessing managed command dependencies', () => {
     const output: string[] = [];
     const dependencies: RunMzshCliDependencies = {
       get home(): string {
@@ -51,7 +51,7 @@ describe('Commander catalog adapter', () => {
       write: (message) => output.push(message),
     };
 
-    expect(runMzshCli(['setup'], dependencies)).toBe(2);
+    expect(runMzshCli(['history'], dependencies)).toBe(2);
     expect(output).toEqual(['MZSH_USAGE_command-unavailable']);
   });
 });

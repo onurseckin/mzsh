@@ -12,6 +12,7 @@ export type CatalogParser =
   | { kind: 'audit'; flags: readonly CatalogFlag[]; positional: 'none' }
   | { kind: 'inventory'; flags: readonly CatalogFlag[]; positional: 'optional-category' }
   | { kind: 'env'; flags: readonly CatalogFlag[]; positional: 'environment-operation' }
+  | { kind: 'setup'; flags: readonly CatalogFlag[]; positional: 'none' }
   | { kind: 'bootstrap'; flags: readonly CatalogFlag[]; positional: 'none' }
   | { kind: 'update'; flags: readonly CatalogFlag[]; positional: 'none' }
   | { kind: 'rollback'; flags: readonly CatalogFlag[]; positional: 'receipt-id' }
@@ -22,6 +23,14 @@ export type CatalogPaletteMetadata = {
 };
 
 export type CatalogCommand =
+  | {
+      name: 'setup';
+      summary: string;
+      risk: CommandRisk;
+      available: true;
+      palette: CatalogPaletteMetadata;
+      parser: Extract<CatalogParser, { kind: 'setup' }>;
+    }
   | {
       name: 'audit';
       summary: string;
@@ -71,7 +80,7 @@ export type CatalogCommand =
       parser: Extract<CatalogParser, { kind: 'env' }>;
     }
   | {
-      name: 'setup' | 'history' | 'tui';
+      name: 'history' | 'tui';
       summary: string;
       risk: CommandRisk;
       available: false;
@@ -87,6 +96,7 @@ export type ManagedCommand =
   | { kind: 'env'; action: 'list'; json: boolean }
   | { kind: 'env'; action: 'get'; name: string; json: boolean }
   | { kind: 'env'; action: 'set'; name: string; json: boolean }
+  | (MutationCommand & { kind: 'setup' })
   | (MutationCommand & { kind: 'bootstrap'; source: string; legacySource?: string })
   | (MutationCommand & { kind: 'update'; source?: string })
   | (MutationCommand & { kind: 'rollback'; receiptId: string });

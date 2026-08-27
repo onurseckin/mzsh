@@ -255,7 +255,7 @@ function parseRecoverySnapshot(value: string): RecoverySnapshot | undefined {
 }
 
 function isAction(value: unknown): value is HistoryRecord['action'] {
-  return value === 'bootstrap' || value === 'update' || value === 'rollback';
+  return value === 'bootstrap' || value === 'setup' || value === 'update' || value === 'rollback';
 }
 
 function isIsoTimestamp(value: string): boolean {

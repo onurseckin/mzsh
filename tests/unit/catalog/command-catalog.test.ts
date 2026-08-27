@@ -77,7 +77,7 @@ describe('command catalog', () => {
       'env',
       'tui',
     ]);
-    expect(parseCatalogArgs(['setup'])).toEqual({ kind: 'catalog-placeholder', command: 'setup' });
+    expect(parseCatalogArgs(['setup'])).toEqual({ kind: 'setup', apply: false });
     expect(parseCatalogArgs(['inventory', 'runtimes', '--json'])).toEqual({
       kind: 'inventory',
       categoryId: 'runtimes',
@@ -104,11 +104,11 @@ describe('command catalog', () => {
     expect(renderCatalogHelp('bootstrap')).toContain(renderCatalogUsage('bootstrap', 'help'));
   });
 
-  test('keeps placeholder flags unavailable through the same catalog grammar', () => {
-    expect(catalog.require('setup').parser.flags).toEqual([]);
+  test('requires review confirmation flags for setup through the catalog grammar', () => {
+    expect(catalog.require('setup').available).toBe(true);
     expect(parseCatalogArgs(['setup', '--apply'])).toEqual({
-      kind: 'usage-error',
-      code: 'invalid-flags',
+      kind: 'setup',
+      apply: true,
     });
   });
 

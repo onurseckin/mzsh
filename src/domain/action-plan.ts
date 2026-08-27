@@ -1,4 +1,4 @@
-export type ReviewedAction = 'bootstrap' | 'update' | 'rollback';
+export type ReviewedAction = 'bootstrap' | 'setup' | 'update' | 'rollback';
 export type RedactedTargetName =
   | 'managed-loader'
   | 'managed-private'

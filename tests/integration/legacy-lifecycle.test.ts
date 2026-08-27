@@ -30,9 +30,7 @@ test('retires the installer before it can mutate an isolated home', () => {
   });
 
   expect(result.exitCode).toBe(2);
-  expect(text(result.stdout)).toContain(
-    'Then: bun run mzsh -- bootstrap --source /absolute/mzsh-checkout'
-  );
+  expect(text(result.stdout)).toContain('Run: mzsh setup');
   expect(text(result.stderr)).toBe('');
 });
 
