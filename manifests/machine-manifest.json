@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "categories": [
+    { "id": "applications", "label": "Applications" },
+    { "id": "runtimes", "label": "Runtimes" },
+    { "id": "managers", "label": "Managers" },
+    { "id": "shell", "label": "Shell" },
+    { "id": "scripts", "label": "Scripts" },
+    { "id": "path", "label": "PATH" },
+    { "id": "environment", "label": "Environment metadata" }
+  ]
+}

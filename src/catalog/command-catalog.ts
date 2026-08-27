@@ -110,9 +110,9 @@ const commands: readonly CatalogCommand[] = [
     name: 'inventory',
     summary: 'Inspect observed machine inventory.',
     risk: 'read-only',
-    available: false,
+    available: true,
     palette: { keywords: ['inventory', 'discover'] },
-    parser: { kind: 'placeholder', flags: [], positional: 'none' },
+    parser: { kind: 'inventory', flags: [jsonFlag], positional: 'optional-category' },
   },
   {
     name: 'env',
@@ -170,7 +170,12 @@ function formatFlagValue(flag: CatalogFlag, style: CatalogUsageStyle): string {
 }
 
 function formatUsage(command: CatalogCommand, style: CatalogUsageStyle): string {
-  const positional = command.parser.positional === 'receipt-id' ? ' receipt-id' : '';
+  const positional =
+    command.parser.positional === 'receipt-id'
+      ? ' receipt-id'
+      : command.parser.positional === 'optional-category'
+        ? ' [category]'
+        : '';
   const flags = command.parser.flags
     .map((flag) => {
       const value = formatFlagValue(flag, style);
@@ -247,6 +252,15 @@ export function parseCatalogArgs(args: readonly string[]): CatalogParseResult {
   if (command.parser.kind === 'audit') {
     return positionals.length === 0
       ? { kind: 'audit', ...(typeof source === 'string' ? { source } : {}), json }
+      : { kind: 'usage-error', code: 'unexpected-positional' };
+  }
+  if (command.parser.kind === 'inventory') {
+    return positionals.length <= 1
+      ? {
+          kind: 'inventory',
+          ...(positionals[0] === undefined ? {} : { categoryId: positionals[0] }),
+          json,
+        }
       : { kind: 'usage-error', code: 'unexpected-positional' };
   }
   if (command.parser.kind === 'bootstrap') {

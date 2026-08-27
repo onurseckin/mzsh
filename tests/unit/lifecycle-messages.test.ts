@@ -22,6 +22,7 @@ test('guides legacy lifecycle callers through the managed reversible workflow', 
     'bun run mzsh -- bootstrap --source /absolute/checkout [--legacy-source /absolute/file] [--apply] [--plan-id reviewed-plan-id] [--confirm APPLY]',
     'bun run mzsh -- update [--source /absolute/checkout] [--apply] [--plan-id reviewed-plan-id] [--confirm APPLY]',
     'bun run mzsh -- rollback receipt-id [--apply] [--plan-id reviewed-plan-id] [--confirm APPLY]',
+    'bun run mzsh -- inventory [category] [--json]',
   ]);
   expect(installMessages.info.starting).toContain('bun run mzsh -- audit');
   expect(installMessages.errors.bootstrapFailed.action).toContain(
@@ -42,12 +43,14 @@ test('guides legacy lifecycle callers through the managed reversible workflow', 
     'bun run mzsh -- bootstrap --source /absolute/checkout [--legacy-source /absolute/file] [--apply] [--plan-id reviewed-plan-id] [--confirm APPLY]',
     'bun run mzsh -- update [--source /absolute/checkout] [--apply] [--plan-id reviewed-plan-id] [--confirm APPLY]',
     'bun run mzsh -- rollback receipt-id [--apply] [--plan-id reviewed-plan-id] [--confirm APPLY]',
+    'bun run mzsh -- inventory [category] [--json]',
   ]);
   expect(checkoutLocalCommandLines).toEqual([
     '  bun run mzsh -- audit [--source /absolute/checkout] [--json]',
     '  bun run mzsh -- bootstrap --source /absolute/checkout [--legacy-source /absolute/file] [--apply] [--plan-id reviewed-plan-id] [--confirm APPLY]',
     '  bun run mzsh -- update [--source /absolute/checkout] [--apply] [--plan-id reviewed-plan-id] [--confirm APPLY]',
     '  bun run mzsh -- rollback receipt-id [--apply] [--plan-id reviewed-plan-id] [--confirm APPLY]',
+    '  bun run mzsh -- inventory [category] [--json]',
   ]);
 });
 

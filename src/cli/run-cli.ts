@@ -3,16 +3,21 @@ import { join } from 'node:path';
 import { applyAdoption } from '../application/apply-adoption';
 import { ReviewedPlanApplicationService } from '../application/apply-reviewed-plan';
 import { auditEnvironment } from '../application/audit-environment';
+import { InventoryService } from '../application/inventory-service';
 import { adoptionPlanFingerprint, planAdoption } from '../application/plan-adoption';
 import { rollbackAdoption, rollbackStateDigest } from '../application/rollback-adoption';
 import { classifySensitiveAssignment } from '../application/sensitive-assignment-policy';
 import type { AdoptionPlan, AdoptionApplyResult, AdoptionRollbackResult } from '../domain/adoption';
 import type { EnvironmentSnapshot } from '../domain/audit';
+import type { InventoryCollectionInput, InventoryRecord } from '../domain/inventory';
+import { CategoryRegistry } from '../domain/categories';
 import { createReviewedPlan } from '../domain/action-plan';
 import { createRecoverySnapshot } from '../domain/history';
 import { SqliteHistory } from '../infrastructure/history-sqlite';
 import { NodeAdoptionFilesystem } from '../infrastructure/adoption-filesystem';
 import { EnvironmentProbes } from '../infrastructure/environment-probes';
+import { InventoryProbes } from '../infrastructure/inventory-probes';
+import { readMachineManifest } from '../infrastructure/manifest-reader';
 import { ZshPreflight } from '../infrastructure/zsh-preflight';
 import { parseArguments } from './parse-arguments';
 
@@ -29,6 +34,9 @@ type Probes = {
     repositoryRoot: string;
   }): EnvironmentSnapshot;
 };
+type InventoryCollector = {
+  collect(input: InventoryCollectionInput): readonly InventoryRecord[];
+};
 
 export interface RunMzshCliDependencies {
   home: string;
@@ -38,12 +46,31 @@ export interface RunMzshCliDependencies {
   write(message: string): void;
   filesystem?: NodeAdoptionFilesystem;
   probes?: Probes;
+  inventory?: InventoryCollector;
   preflight?: Preflight;
   id?: () => string;
   reviewedPlanId?: () => string;
   apply?: typeof applyAdoption;
   rollback?: typeof rollbackAdoption;
   rollbackStateDigest?: typeof rollbackStateDigest;
+}
+
+function defaultInventoryCollector(): InventoryCollector {
+  const manifest = readMachineManifest(
+    join(__dirname, '..', '..', 'manifests', 'machine-manifest.json')
+  );
+  return new InventoryService(new CategoryRegistry(manifest.categories), [new InventoryProbes()]);
+}
+
+function collectInventory(
+  dependencies: RunMzshCliDependencies,
+  input: InventoryCollectionInput
+): readonly InventoryRecord[] | undefined {
+  try {
+    return (dependencies.inventory ?? defaultInventoryCollector()).collect(input);
+  } catch {
+    return undefined;
+  }
 }
 
 function isSuccess(result: AdoptionApplyResult | AdoptionRollbackResult): boolean {
@@ -133,18 +160,40 @@ export function runMzshCli(args: readonly string[], dependencies: RunMzshCliDepe
   const filesystem = dependencies.filesystem ?? new NodeAdoptionFilesystem();
   if (parsed.kind === 'audit') {
     const repositoryRoot = parsed.source ?? dependencies.repositoryRoot;
-    const report = auditEnvironment(
-      (dependencies.probes ?? new EnvironmentProbes()).collect({
-        home: dependencies.home,
-        xdgConfig: dependencies.xdgConfig,
-        xdgCache: dependencies.xdgCache,
-        repositoryRoot,
-      })
-    );
+    const snapshot = (dependencies.probes ?? new EnvironmentProbes()).collect({
+      home: dependencies.home,
+      xdgConfig: dependencies.xdgConfig,
+      xdgCache: dependencies.xdgCache,
+      repositoryRoot,
+    });
+    const report = auditEnvironment(snapshot, collectInventory(dependencies, { snapshot }) ?? []);
     if (parsed.json) dependencies.write(JSON.stringify(report));
     else
       for (const finding of report.findings)
         dependencies.write(`${finding.severity.toUpperCase()} ${finding.code} ${finding.message}`);
+    return 0;
+  }
+  if (parsed.kind === 'inventory') {
+    const snapshot = (dependencies.probes ?? new EnvironmentProbes()).collect({
+      home: dependencies.home,
+      xdgConfig: dependencies.xdgConfig,
+      xdgCache: dependencies.xdgCache,
+      repositoryRoot: dependencies.repositoryRoot,
+    });
+    const records = collectInventory(dependencies, {
+      ...(parsed.categoryId === undefined ? {} : { categoryId: parsed.categoryId }),
+      snapshot,
+    });
+    if (records === undefined) {
+      dependencies.write('MZSH_USAGE_inventory-unavailable');
+      return 2;
+    }
+    if (parsed.json) dependencies.write(JSON.stringify(records));
+    else
+      for (const record of records) {
+        const version = record.version === undefined ? '' : ` ${record.version}`;
+        dependencies.write(`${record.categoryId} ${record.name} ${record.status}${version}`);
+      }
     return 0;
   }
   if (parsed.kind === 'rollback') {

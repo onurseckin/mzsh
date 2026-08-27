@@ -1,4 +1,5 @@
 import type {
+  AuditInventoryRecord,
   AuditFinding,
   AuditFindingCode,
   AuditRemediation,
@@ -6,6 +7,7 @@ import type {
   EnvironmentAuditReport,
   EnvironmentSnapshot,
 } from '../domain/audit';
+import type { InventoryRecord } from '../domain/inventory';
 import type { RepositoryInvalidCode, RepositoryState } from '../domain/repository-state';
 
 function finding(
@@ -41,7 +43,29 @@ function redactRepositoryState(repository: RepositoryState): RepositoryState {
   };
 }
 
-export function auditEnvironment(snapshot: EnvironmentSnapshot): EnvironmentAuditReport {
+function redactInventory(records: readonly InventoryRecord[]): readonly AuditInventoryRecord[] {
+  return records.map((record) => {
+    const metadata = Object.fromEntries(
+      Object.entries(record.metadata ?? {}).filter(
+        (entry): entry is [string, boolean | number] =>
+          typeof entry[1] === 'boolean' || typeof entry[1] === 'number'
+      )
+    );
+    const version = record.version?.match(/^\d+(?:\.\d+){1,3}$/)?.[0];
+    return {
+      categoryId: record.categoryId,
+      status: record.status,
+      origin: record.origin,
+      ...(version === undefined ? {} : { version }),
+      ...(Object.keys(metadata).length === 0 ? {} : { metadata }),
+    };
+  });
+}
+
+export function auditEnvironment(
+  snapshot: EnvironmentSnapshot,
+  inventory: readonly InventoryRecord[] = []
+): EnvironmentAuditReport {
   const findings: AuditFinding[] = [];
   const repository = redactRepositoryState(snapshot.repository);
 
@@ -255,5 +279,11 @@ export function auditEnvironment(snapshot: EnvironmentSnapshot): EnvironmentAudi
     );
   }
 
-  return { version: 1, roots: snapshot.roots, repository, findings };
+  return {
+    version: 1,
+    roots: snapshot.roots,
+    repository,
+    inventory: redactInventory(inventory),
+    findings,
+  };
 }

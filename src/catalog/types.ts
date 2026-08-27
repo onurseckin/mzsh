@@ -10,6 +10,7 @@ export type CatalogFlag =
 
 export type CatalogParser =
   | { kind: 'audit'; flags: readonly CatalogFlag[]; positional: 'none' }
+  | { kind: 'inventory'; flags: readonly CatalogFlag[]; positional: 'optional-category' }
   | { kind: 'bootstrap'; flags: readonly CatalogFlag[]; positional: 'none' }
   | { kind: 'update'; flags: readonly CatalogFlag[]; positional: 'none' }
   | { kind: 'rollback'; flags: readonly CatalogFlag[]; positional: 'receipt-id' }
@@ -53,7 +54,15 @@ export type CatalogCommand =
       parser: Extract<CatalogParser, { kind: 'rollback' }>;
     }
   | {
-      name: 'setup' | 'history' | 'inventory' | 'env' | 'tui';
+      name: 'inventory';
+      summary: string;
+      risk: CommandRisk;
+      available: true;
+      palette: CatalogPaletteMetadata;
+      parser: Extract<CatalogParser, { kind: 'inventory' }>;
+    }
+  | {
+      name: 'setup' | 'history' | 'env' | 'tui';
       summary: string;
       risk: CommandRisk;
       available: false;
@@ -65,6 +74,7 @@ export type CatalogCommandName = CatalogCommand['name'];
 
 export type ManagedCommand =
   | { kind: 'audit'; source?: string; json: boolean }
+  | { kind: 'inventory'; categoryId?: string; json: boolean }
   | (MutationCommand & { kind: 'bootstrap'; source: string; legacySource?: string })
   | (MutationCommand & { kind: 'update'; source?: string })
   | (MutationCommand & { kind: 'rollback'; receiptId: string });

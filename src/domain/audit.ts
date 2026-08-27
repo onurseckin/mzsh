@@ -1,4 +1,5 @@
 import type { RepositoryState } from './repository-state';
+import type { InventoryOrigin, InventoryStatus } from './inventory';
 
 export type AuditSeverity = 'info' | 'warning' | 'error';
 export type AuditRemediationKind = 'inspect' | 'repair' | 'configure';
@@ -97,5 +98,14 @@ export interface EnvironmentAuditReport {
   version: 1;
   roots: EnvironmentSnapshot['roots'];
   repository: RepositoryState;
+  inventory: readonly AuditInventoryRecord[];
   findings: readonly AuditFinding[];
+}
+
+export interface AuditInventoryRecord {
+  categoryId: string;
+  status: InventoryStatus;
+  origin: InventoryOrigin;
+  version?: string;
+  metadata?: Readonly<Record<string, boolean | number>>;
 }

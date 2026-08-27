@@ -65,7 +65,7 @@ describe('command catalog', () => {
     });
   });
 
-  test('lists future product commands without making them executable', () => {
+  test('lists product commands and routes inventory through catalog parsing', () => {
     expect(catalog.commands.map((command) => command.name)).toEqual([
       'audit',
       'bootstrap',
@@ -78,6 +78,11 @@ describe('command catalog', () => {
       'tui',
     ]);
     expect(parseCatalogArgs(['setup'])).toEqual({ kind: 'catalog-placeholder', command: 'setup' });
+    expect(parseCatalogArgs(['inventory', 'runtimes', '--json'])).toEqual({
+      kind: 'inventory',
+      categoryId: 'runtimes',
+      json: true,
+    });
   });
 
   test('renders completion candidates from the command catalog', () => {
