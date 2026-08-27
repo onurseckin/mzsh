@@ -3,6 +3,15 @@ export const redactedValue = '[REDACTED]' as const;
 export interface RedactionProvenance {
   readonly source: string;
   readonly revision: string;
+  readonly sourcePath: string;
+  readonly ruleIdentifiers: readonly string[];
+  readonly extraction: readonly RedactionPrefixExtraction[];
+}
+
+export interface RedactionPrefixExtraction {
+  readonly prefix: string;
+  readonly sourcePath: string;
+  readonly ruleId: string;
 }
 
 export interface RedactionRegistry {

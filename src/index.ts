@@ -19,9 +19,23 @@ import { InteractiveMenu } from './interactiveMenu';
 import { appMessages, formatMessage } from './messages';
 import { type OpenType, getAvailableOpenTypes, getOpenConfig, isValidOpenType } from './openConfig';
 import { runMzshCli } from './cli/run-cli';
+import type { RunMzshCliDependencies } from './cli/run-cli';
 import { catalog, renderCatalogUsage } from './catalog/command-catalog';
 import { createCommanderAdapter } from './catalog/commander-adapter';
 import { resolve } from 'node:path';
+import { join } from 'node:path';
+import { AuthLeaseService } from './application/auth-lease';
+import { EnvironmentService } from './application/environment-service';
+import { RedactionService } from './application/redaction-service';
+import type { OperatingSystemAuthorization } from './domain/auth';
+import { gatewayRedactionRegistry } from './infrastructure/gateway-redaction-registry';
+import { OwnerOnlyAuthLeaseStore } from './infrastructure/owner-only-auth-lease-store';
+import {
+  OwnerOnlyPrivateEnvironment,
+  type OpenPrivateBoundary,
+} from './infrastructure/owner-only-private-environment';
+import { OsAuth } from './infrastructure/os-auth';
+import { openPrivateBoundary } from './infrastructure/open-private-boundary';
 
 export { renderZshCompletion } from './catalog/completion';
 
@@ -39,6 +53,42 @@ export function isManagedCliRoute(args: readonly string[]): boolean {
 export const checkoutLocalCommandLines = catalog.commands
   .filter((command) => command.available)
   .map((command) => `  bun run mzsh -- ${renderCatalogUsage(command.name, 'checkout')}`);
+
+export interface ManagedCliDependenciesInput {
+  readonly home: string;
+  readonly xdgConfig: string;
+  readonly xdgCache: string;
+  readonly repositoryRoot: string;
+  readonly write: (message: string) => void;
+  readonly authorization?: OperatingSystemAuthorization;
+  readonly owner?: () => string;
+  readonly openPrivateBoundary?: OpenPrivateBoundary;
+}
+
+export function createManagedCliDependencies(
+  input: ManagedCliDependenciesInput
+): RunMzshCliDependencies {
+  const managedRoot = join(input.xdgConfig, 'mzsh');
+  return {
+    home: input.home,
+    xdgConfig: input.xdgConfig,
+    xdgCache: input.xdgCache,
+    repositoryRoot: input.repositoryRoot,
+    write: input.write,
+    environment: new EnvironmentService(
+      new OwnerOnlyPrivateEnvironment(
+        join(managedRoot, 'private.zsh'),
+        input.openPrivateBoundary ?? openPrivateBoundary
+      ),
+      new RedactionService(gatewayRedactionRegistry)
+    ),
+    authLease: new AuthLeaseService({
+      authorization: input.authorization ?? new OsAuth(),
+      store: new OwnerOnlyAuthLeaseStore(join(managedRoot, 'auth-lease.json')),
+      owner: input.owner ?? (() => String(process.getuid?.() ?? 'unknown')),
+    }),
+  };
+}
 
 /**
  * ZshrcManager - Main command class for the mzsh CLI tool
@@ -99,13 +149,16 @@ export default class ZshrcManager extends Command {
     try {
       const managedArgs = this.argv || process.argv.slice(2);
       if (isManagedCliRoute(managedArgs)) {
-        process.exitCode = runMzshCli(managedArgs, {
-          home: process.env.HOME ?? '/',
-          xdgConfig: process.env.XDG_CONFIG_HOME ?? `${process.env.HOME ?? '/'}/.config`,
-          xdgCache: process.env.XDG_CACHE_HOME ?? `${process.env.HOME ?? '/'}/.cache`,
-          repositoryRoot: managedRepositoryRoot(__dirname),
-          write: (message) => console.log(message),
-        });
+        process.exitCode = runMzshCli(
+          managedArgs,
+          createManagedCliDependencies({
+            home: process.env.HOME ?? '/',
+            xdgConfig: process.env.XDG_CONFIG_HOME ?? `${process.env.HOME ?? '/'}/.config`,
+            xdgCache: process.env.XDG_CACHE_HOME ?? `${process.env.HOME ?? '/'}/.cache`,
+            repositoryRoot: managedRepositoryRoot(__dirname),
+            write: (message) => console.log(message),
+          })
+        );
         return;
       }
       // Initialize default values for command processing

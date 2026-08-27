@@ -88,6 +88,9 @@ describe('MZSH managed CLI', () => {
     expect(classifySensitiveAssignment('export API_TOKEN=inert-placeholder')).toBe(true);
     expect(classifySensitiveAssignment('export PATH=/safe/bin')).toBe(false);
     expect(classifySensitiveAssignment('export TOKEN=$(unsafe)')).toBe(true);
+    expect(classifySensitiveAssignment('export MZSH_TOKEN_LABEL=')).toBe(true);
+    expect(classifySensitiveAssignment('export MZSH_AUTH_KEYRING=')).toBe(true);
+    expect(classifySensitiveAssignment('export TOKEN?=')).toBe(false);
   });
 
   test('renders real audit reports as approved JSON or stable human findings', () => {

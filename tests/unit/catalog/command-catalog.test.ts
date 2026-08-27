@@ -135,5 +135,8 @@ describe('command catalog', () => {
       kind: 'usage-error',
       code: 'unexpected-positional',
     });
+    expect(renderCatalogHelp('audit')).toContain('Render the audit report as JSON.');
+    expect(renderCatalogHelp('inventory')).toContain('Render inventory metadata as JSON.');
+    expect(renderCatalogHelp('env')).toContain('Render redacted environment metadata as JSON.');
   });
 });

@@ -23,10 +23,20 @@ const confirmFlag: CatalogFlag = {
   value: 'confirmation',
   description: 'Confirm the reviewed plan with the literal value APPLY.',
 };
-const jsonFlag: CatalogFlag = {
+const auditJsonFlag: CatalogFlag = {
   name: 'json',
   value: 'boolean',
   description: 'Render the audit report as JSON.',
+};
+const inventoryJsonFlag: CatalogFlag = {
+  name: 'json',
+  value: 'boolean',
+  description: 'Render inventory metadata as JSON.',
+};
+const environmentJsonFlag: CatalogFlag = {
+  name: 'json',
+  value: 'boolean',
+  description: 'Render redacted environment metadata as JSON.',
 };
 const sourceFlag: CatalogFlag = {
   name: 'source',
@@ -46,7 +56,7 @@ const commands: readonly CatalogCommand[] = [
     risk: 'read-only',
     available: true,
     palette: { keywords: ['audit', 'inspect'] },
-    parser: { kind: 'audit', flags: [sourceFlag, jsonFlag], positional: 'none' },
+    parser: { kind: 'audit', flags: [sourceFlag, auditJsonFlag], positional: 'none' },
   },
   {
     name: 'bootstrap',
@@ -112,7 +122,7 @@ const commands: readonly CatalogCommand[] = [
     risk: 'read-only',
     available: true,
     palette: { keywords: ['inventory', 'discover'] },
-    parser: { kind: 'inventory', flags: [jsonFlag], positional: 'optional-category' },
+    parser: { kind: 'inventory', flags: [inventoryJsonFlag], positional: 'optional-category' },
   },
   {
     name: 'env',
@@ -120,7 +130,7 @@ const commands: readonly CatalogCommand[] = [
     risk: 'sensitive',
     available: true,
     palette: { keywords: ['env', 'private'] },
-    parser: { kind: 'env', flags: [jsonFlag], positional: 'environment-operation' },
+    parser: { kind: 'env', flags: [environmentJsonFlag], positional: 'environment-operation' },
   },
   {
     name: 'tui',
