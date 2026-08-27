@@ -47,19 +47,19 @@ architecture-specific Homebrew default is assumed.
 
 ## Variables and tool policy
 
-| Variable | Purpose |
-| --- | --- |
-| `MZSH_COMMAND_SHIM_DIR` | Existing command-safety shim directory, registered first. |
-| `MZSH_HOMEBREW_PREFIX` | Homebrew prefix used for `bin`, `sbin`, and its Zsh completion directory. |
-| `MZSH_MACPORTS_PREFIX` | Optional MacPorts prefix used for `bin` and `sbin`. |
-| `BUN_INSTALL` | Bun installation root. |
-| `NVM_DIR` | Existing NVM installation root. |
-| `CARGO_HOME` | Rust/Cargo root; defaults to the conventional home-relative location. |
-| `ANDROID_HOME` / `ANDROID_SDK_ROOT` | Android SDK root; `ANDROID_HOME` wins when both are set. |
-| `MZSH_OH_MY_ZSH_ROOT` | Optional Oh My Zsh root; defaults to `$HOME/.oh-my-zsh`. |
-| `MZSH_DOCKER_COMPLETION_DIR` | Existing Docker completion directory to register before completion initialization. |
-| `MZSH_PRIVATE_ZSH` | Optional local private-file override. |
-| `MZSH_OBSERVE=1` | Enables redacted diagnostics on stderr. |
+| Variable                            | Purpose                                                                            |
+| ----------------------------------- | ---------------------------------------------------------------------------------- |
+| `MZSH_COMMAND_SHIM_DIR`             | Existing command-safety shim directory, registered first.                          |
+| `MZSH_HOMEBREW_PREFIX`              | Homebrew prefix used for `bin`, `sbin`, and its Zsh completion directory.          |
+| `MZSH_MACPORTS_PREFIX`              | Optional MacPorts prefix used for `bin` and `sbin`.                                |
+| `BUN_INSTALL`                       | Bun installation root.                                                             |
+| `NVM_DIR`                           | Existing NVM installation root.                                                    |
+| `CARGO_HOME`                        | Rust/Cargo root; defaults to the conventional home-relative location.              |
+| `ANDROID_HOME` / `ANDROID_SDK_ROOT` | Android SDK root; `ANDROID_HOME` wins when both are set.                           |
+| `MZSH_OH_MY_ZSH_ROOT`               | Optional Oh My Zsh root; defaults to `$HOME/.oh-my-zsh`.                           |
+| `MZSH_DOCKER_COMPLETION_DIR`        | Existing Docker completion directory to register before completion initialization. |
+| `MZSH_PRIVATE_ZSH`                  | Optional local private-file override.                                              |
+| `MZSH_OBSERVE=1`                    | Enables redacted diagnostics on stderr.                                            |
 
 NVM has the auditable policy `MZSH_NVM_POLICY=existing-installation-only`.
 Startup sources `nvm.sh` only when that file already exists. It never installs

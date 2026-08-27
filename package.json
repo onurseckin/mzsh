@@ -1,12 +1,12 @@
 {
   "name": "mzsh",
   "version": "1.0.0",
-  "module": "index.ts",
-  "type": "commonjs",
   "private": false,
   "bin": {
     "mzsh": "./bin/run-standalone.ts"
   },
+  "type": "commonjs",
+  "module": "index.ts",
   "scripts": {
     "build": "bun run clean && tsc && bun build lib/index.js --outdir dist --target bun --minify",
     "build:dev": "bun run clean && tsc && bun build lib/index.js --outdir dist --target bun",
@@ -17,39 +17,36 @@
     "uninst": "./uninstall.sh",
     "start": "bun run bin/run.ts",
     "update": "./uninstall.sh && ./install.sh",
-    "lint": "eslint .",
-    "lint:fix": "eslint . --fix",
-    "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "lint": "oxlint --type-aware --max-warnings 0 .",
+    "lint:fix": "oxlint --type-aware --fix .",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check .",
+    "shell:check": "bash scripts/check-shell-quality.sh",
+    "line:check": "bun scripts/check-typescript-line-limits.ts",
+    "quality:check": "bun run lint && bun run format:check && bun run shell:check && bun run line:check"
+  },
+  "dependencies": {
+    "@oclif/core": "^4.14.0",
+    "@oclif/plugin-help": "^6.3.0",
+    "chalk": "^5.6.2",
+    "fs-extra": "^11.4.0",
+    "inquirer": "^12.11.1"
   },
   "devDependencies": {
     "@types/bun": "latest",
     "@types/fs-extra": "^11.0.4",
-    "@types/inquirer": "^9.0.9",
-    "@typescript-eslint/eslint-plugin": "^8.39.1",
-    "@typescript-eslint/parser": "^8.39.1",
-    "eslint": "^9.33.0",
-    "eslint-config-prettier": "^10.1.8",
-    "eslint-plugin-prettier": "^5.5.4",
-    "jiti": "^2.5.1",
-    "prettier": "^3.6.2"
-  },
-  "peerDependencies": {
-    "typescript": "^5.9.2"
+    "@types/inquirer": "^9.0.10",
+    "oxfmt": "^0.65.0",
+    "oxlint": "^1.80.0",
+    "oxlint-tsgolint": "^7.0.2001",
+    "typescript": "^7.0.2"
   },
   "oclif": {
     "bin": "mzsh",
-    "dirname": "mzsh",
     "commands": "./lib",
+    "dirname": "mzsh",
     "plugins": [
       "@oclif/plugin-help"
     ]
-  },
-  "dependencies": {
-    "@oclif/core": "^4.5.2",
-    "@oclif/plugin-help": "^6.2.32",
-    "chalk": "^5.5.0",
-    "fs-extra": "^11.3.1",
-    "inquirer": "^12.9.2"
   }
 }

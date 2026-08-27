@@ -3,14 +3,15 @@
     // Environment setup & latest features
     "lib": ["ESNext"],
     "target": "ES2020",
-    "module": "CommonJS",
+    "module": "Preserve",
     "moduleDetection": "auto",
     "allowJs": true,
     "outDir": "./lib",
     "rootDir": "./src",
 
     // Module resolution
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
+    "types": ["bun"],
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "resolveJsonModule": true,
