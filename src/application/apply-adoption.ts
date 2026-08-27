@@ -3,6 +3,7 @@ import type { AdoptionApplyResult, AdoptionMutation, AdoptionReceipt, AdoptionRe
 import type { AdoptionPlan } from "../domain/adoption";
 import type { RegularFileSnapshot } from "../infrastructure/adoption-filesystem";
 import { NodeAdoptionFilesystem } from "../infrastructure/adoption-filesystem";
+import { renderStableLoader } from "./render-stable-loader";
 
 export interface ApplyAdoptionDependencies {
   filesystem: NodeAdoptionFilesystem;
@@ -14,13 +15,6 @@ export interface ApplyAdoptionDependencies {
 
 function sameState(left: AdoptionTargetState, right: AdoptionTargetState): boolean {
   return left.kind === right.kind && left.mode === right.mode && left.ownerId === right.ownerId && left.hash === right.hash && left.linkTarget === right.linkTarget;
-}
-
-function loaderText(category: "loader", path: string): string {
-  const name = basename(path);
-  const boundary = name === ".zshrc" ? '[[ -o interactive ]] || return 0\n' : name === ".zprofile" ? '[[ -o login ]] || return 0\n' : "";
-  const source = `"${"${XDG_CONFIG_HOME:-$HOME/.config}"}/mzsh/current/loaders/${name.slice(1)}.zsh"`;
-  return `# mzsh-managed-loader\n${boundary}if [[ ! -r ${source} ]]; then\n  [[ -o interactive ]] && print -u2 -- "mzsh: managed loader unavailable"\n  return 0\nfi\nsource ${source}\n`;
 }
 
 function receiptPath(plan: AdoptionPlan): string {
@@ -118,7 +112,7 @@ export function applyAdoption(plan: AdoptionPlan, dependencies: ApplyAdoptionDep
       if (mutation.kind === "symlink" && mutation.linkTarget !== undefined) {
         filesystem.linkAtomic(mutation.path, mutation.linkTarget);
       } else if (mutation.category === "loader") {
-        filesystem.writeAtomic(mutation.path, loaderText("loader", mutation.path));
+        filesystem.writeAtomic(mutation.path, renderStableLoader(basename(mutation.path) as ".zshenv" | ".zprofile" | ".zshrc"));
       } else if (mutation.category === "private") {
         const existingPrivate = target.before.kind === "file" ? filesystem.read(mutation.path) : "";
         const privateLines = plan.privateMigration === undefined

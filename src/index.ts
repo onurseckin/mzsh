@@ -18,8 +18,16 @@ import { FileDiscovery } from './fileDiscovery';
 import { InteractiveMenu } from './interactiveMenu';
 import { appMessages, formatMessage } from './messages';
 import { type OpenType, getAvailableOpenTypes, getOpenConfig, isValidOpenType } from './openConfig';
-import { SelfUninstaller } from './selfUninstaller';
-import { UpdateManager } from './updateManager';
+import { runMzshCli } from './cli/run-cli';
+import { resolve } from 'node:path';
+
+export function managedRepositoryRoot(moduleDirectory: string): string {
+  return resolve(moduleDirectory, '..');
+}
+
+export function isManagedCliRoute(args: readonly string[]): boolean {
+  return ["audit", "bootstrap", "update", "rollback"].includes(args[0] ?? "") || args.some((arg) => ["--update", "--reinstall", "--uninst"].includes(arg));
+}
 
 /**
  * ZshrcManager - Main command class for the mzsh CLI tool
@@ -41,12 +49,10 @@ export default class ZshrcManager extends Command {
 
   /** Example usage patterns displayed in help documentation */
   static override examples = [
-    '<%= config.bin %> <%= command.id %>',
-    '<%= config.bin %> <%= command.id %> -o vim',
-    '<%= config.bin %> <%= command.id %> --open-type code',
-    '<%= config.bin %> <%= command.id %> --update',
-    '<%= config.bin %> <%= command.id %> --reinstall',
-    '<%= config.bin %> <%= command.id %> --uninst',
+    'mzsh audit --json',
+    'mzsh bootstrap --source /absolute/mzsh-checkout',
+    'mzsh update --source /absolute/mzsh-checkout --apply',
+    'mzsh rollback receipt-id --apply',
   ];
 
   /**
@@ -60,15 +66,6 @@ export default class ZshrcManager extends Command {
       default: 'default',
       options: getAvailableOpenTypes(), // Validates against available editor types
     }),
-    update: Flags.boolean({
-      description: 'Update zshrc-manager to the latest version',
-    }),
-    reinstall: Flags.boolean({
-      description: 'Reinstall zshrc-manager (same as --update)',
-    }),
-    uninst: Flags.boolean({
-      description: 'Uninstall mzsh from the system',
-    }),
   };
 
   /**
@@ -77,8 +74,6 @@ export default class ZshrcManager extends Command {
    */
   private fileDiscovery = new FileDiscovery(); // Handles finding zsh config files
   private interactiveMenu = new InteractiveMenu(); // Manages user interaction and file selection
-  private selfUninstaller = new SelfUninstaller(); // Handles self-uninstallation
-  private updateManager = new UpdateManager(); // Handles update/reinstall operations
 
   /**
    * Main execution method - orchestrates the entire application flow
@@ -97,10 +92,19 @@ export default class ZshrcManager extends Command {
    */
   override async run(): Promise<void> {
     try {
+      const managedArgs = this.argv || process.argv.slice(2);
+      if (isManagedCliRoute(managedArgs)) {
+        process.exitCode = runMzshCli(managedArgs, {
+          home: process.env.HOME ?? "/",
+          xdgConfig: process.env.XDG_CONFIG_HOME ?? `${process.env.HOME ?? "/"}/.config`,
+          xdgCache: process.env.XDG_CACHE_HOME ?? `${process.env.HOME ?? "/"}/.cache`,
+          repositoryRoot: managedRepositoryRoot(__dirname),
+          write: (message) => console.log(message),
+        });
+        return;
+      }
       // Initialize default values for command processing
       let openType: OpenType = 'default';
-      let shouldUpdate = false;
-      let shouldUninstall = false;
 
       // Dual-mode argument parsing: OCLIF vs Standalone
       if (this.config && typeof this.config.runHook === 'function') {
@@ -108,18 +112,11 @@ export default class ZshrcManager extends Command {
         // This provides rich flag validation, help generation, and error handling
         const { flags } = await this.parse(ZshrcManager);
         openType = flags['open-type'] as OpenType;
-        shouldUpdate = flags.update || flags.reinstall;
-        shouldUninstall = flags.uninst;
       } else {
         // STANDALONE MODE: Manual argument parsing for maximum compatibility
         // This allows the tool to work even when OCLIF framework isn't fully loaded
         const args = this.argv || process.argv.slice(2);
 
-        // Check for update operations first (they don't require file discovery)
-        shouldUpdate = args.includes('--update') || args.includes('--reinstall');
-
-        // Check for uninstall operation
-        shouldUninstall = args.includes('--uninst');
 
         // Handle help requests manually in standalone mode
         if (args.includes('--help') || args.includes('-h')) {
@@ -149,19 +146,7 @@ export default class ZshrcManager extends Command {
 
       // ROUTING: Determine which functionality to execute
 
-      // Route 1: Uninstall Operations
-      if (shouldUninstall) {
-        await this.selfUninstaller.runUninstall();
-        return;
-      }
-
-      // Route 2: Update/Reinstall Operations
-      if (shouldUpdate) {
-        await this.updateManager.runUpdate();
-        return;
-      }
-
-      // Route 3: File Management Operations
+      // Route: File Management Operations
 
       // Step 1: Discover available zsh configuration files
       const files = await this.fileDiscovery.discoverZshFiles();
@@ -209,19 +194,18 @@ export default class ZshrcManager extends Command {
     console.log(appMessages.help.description);
     console.log('');
     console.log('USAGE');
-    console.log(`  ${appMessages.help.usage}`);
+    console.log('  mzsh audit [--source /absolute/checkout] [--json]');
+    console.log('  mzsh bootstrap --source /absolute/checkout [--apply]');
+    console.log('  mzsh update [--source /absolute/checkout] [--apply]');
+    console.log('  mzsh rollback receipt-id [--apply]');
     console.log('');
     console.log('OPTIONS');
     console.log(`  ${appMessages.help.options.openType}`);
     console.log(`                          Options: ${getAvailableOpenTypes().join(', ')}`);
-    console.log(`      ${appMessages.help.options.update}`);
-    console.log(`      ${appMessages.help.options.reinstall}`);
-    console.log(`      ${appMessages.help.options.uninst}`);
     console.log(`  ${appMessages.help.options.help}`);
     console.log('');
     console.log('EXAMPLES');
-    appMessages.help.examples.forEach((example) => {
-      console.log(`  ${example}`);
-    });
+    console.log('  mzsh audit --json');
+    console.log('  mzsh bootstrap --source /absolute/mzsh-checkout');
   }
 }
