@@ -88,6 +88,11 @@ change only a current-user-owned PATH directory target, never execute code
 during shell startup. MZSH does not call package managers, install software,
 query the network, or select a runtime version.
 
+Stable loader files are closed managed programs. Installers and local startup
+customizations must not append PATH changes or other commands after their
+managed source line; adopt such a loader again through the guarded transaction
+so the prior bytes are backed up and the replacement is atomic.
+
 ## Completion ownership
 
 `completion-directories` registers Homebrew and Docker completion directories

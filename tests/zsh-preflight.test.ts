@@ -45,6 +45,21 @@ describe('stable loader rendering', () => {
     expect(interactive).toContain('[[ -r $mzsh_instant_prompt && ! -L $mzsh_instant_prompt ]]');
   });
 
+  test('renders each stable loader as a closed managed program', () => {
+    expect(renderStableLoader('.zshrc')).toBe(
+      '# mzsh-managed-loader\n' +
+        '[[ -o interactive ]] || return 0\n' +
+        'typeset mzsh_instant_prompt="${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"\n' +
+        'if [[ -r $mzsh_instant_prompt && ! -L $mzsh_instant_prompt ]]; then\n' +
+        '  source "$mzsh_instant_prompt"\nfi\n' +
+        'unset mzsh_instant_prompt\n' +
+        'if [[ ! -r "${XDG_CONFIG_HOME:-$HOME/.config}/mzsh/current/loaders/zshrc.zsh" ]]; then\n' +
+        '  [[ -o interactive ]] && print -u2 -- "mzsh: managed loader unavailable"\n' +
+        '  return 0\nfi\n' +
+        'source "${XDG_CONFIG_HOME:-$HOME/.config}/mzsh/current/loaders/zshrc.zsh"\n'
+    );
+  });
+
   test('syntax-checks an isolated portable checkout and fails closed for invalid syntax', () => {
     const root = mkdtempSync(join(tmpdir(), 'mzsh-preflight-test-'));
     fixtures.push(root);
