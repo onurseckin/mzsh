@@ -13,6 +13,18 @@ interface LoaderPreflight {
   current: string | undefined;
 }
 
+export interface ShellSetupRecoveryOutcome {
+  attempted: number;
+  restored: number;
+  failed: number;
+}
+
+const recoveryOutcomes = new WeakMap<Error, ShellSetupRecoveryOutcome>();
+
+export function shellSetupRecoveryOutcome(error: unknown): ShellSetupRecoveryOutcome | undefined {
+  return error instanceof Error ? recoveryOutcomes.get(error) : undefined;
+}
+
 export interface BunLinkProcess {
   run(root: string): number;
 }
@@ -54,17 +66,30 @@ export class ShellSetup implements ShellReconciler {
         this.filesystem.writeAtomic(entry.path, entry.expected, 0o600);
       }
     } catch (error) {
-      this.recover(applied);
+      this.recordRecovery(error, this.recover(applied));
       throw error;
     }
     return 'shell-reconciled';
   }
 
-  private recover(entries: readonly LoaderPreflight[]): void {
+  private recover(entries: readonly LoaderPreflight[]): ShellSetupRecoveryOutcome {
+    let restored = 0;
+    let failed = 0;
     for (const entry of [...entries].reverse()) {
-      if (entry.current === undefined) this.filesystem.remove(entry.path);
-      else this.filesystem.writeAtomic(entry.path, entry.current, 0o600);
+      try {
+        if (entry.current === undefined) this.filesystem.remove(entry.path);
+        else this.filesystem.writeAtomic(entry.path, entry.current, 0o600);
+        restored += 1;
+      } catch {
+        failed += 1;
+      }
     }
+    return { attempted: entries.length, restored, failed };
+  }
+
+  private recordRecovery(error: unknown, outcome: ShellSetupRecoveryOutcome): void {
+    if (!(error instanceof Error)) return;
+    recoveryOutcomes.set(error, outcome);
   }
 
   private current(path: string): string | undefined {

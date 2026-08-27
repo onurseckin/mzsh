@@ -26,3 +26,10 @@
 - Registered each pending loader for recovery before its atomic write and added an injected post-replace failure fixture that verifies all preflight contents are restored.
 - RED: `bun test tests/integration/setup/setup-fixture.test.ts` produced 2 pass, 1 fail with the failed loader retaining rendered content.
 - GREEN: the focused test produced 3 pass, 0 fail; `bun run build:ts` and `bun run validate` passed with 92 unit and 85 integration tests; `git diff --check` passed.
+
+## Review fix round 3
+
+- Reproduced persistent post-replace and post-remove recovery failures: recovery stopped at the first failed restoration and replaced the original mutation error.
+- Recovery now attempts every loader, preserves the original mutation error, and exposes only count-based recovery evidence through `shellSetupRecoveryOutcome`.
+- RED: `bun test tests/integration/setup/setup-fixture.test.ts` produced 3 pass, 2 fail because both fixtures emitted `INJECTED_RECOVERY_FAILURE` instead of the original mutation error.
+- GREEN: the focused test produced 5 pass, 0 fail; `bun run build:ts` and `bun run validate` passed with 92 unit and 87 integration tests; `git diff --check` passed.
