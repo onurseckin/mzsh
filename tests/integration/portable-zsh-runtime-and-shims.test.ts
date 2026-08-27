@@ -14,7 +14,7 @@ import {
 } from 'node:fs';
 import { join, resolve } from 'node:path';
 
-const shims = join(import.meta.dir, '..', 'portable', 'zsh', 'shims');
+const shims = join(import.meta.dir, '../..', 'portable', 'zsh', 'shims');
 const fixtureParent = join(import.meta.dir, '.fixtures');
 const fixtures: string[] = [];
 

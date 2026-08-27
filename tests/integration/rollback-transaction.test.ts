@@ -11,10 +11,10 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { applyAdoption } from '../src/application/apply-adoption';
-import { planAdoption } from '../src/application/plan-adoption';
-import { rollbackAdoption } from '../src/application/rollback-adoption';
-import { NodeAdoptionFilesystem } from '../src/infrastructure/adoption-filesystem';
+import { applyAdoption } from '../../src/application/apply-adoption';
+import { planAdoption } from '../../src/application/plan-adoption';
+import { rollbackAdoption } from '../../src/application/rollback-adoption';
+import { NodeAdoptionFilesystem } from '../../src/infrastructure/adoption-filesystem';
 
 const fixtureParent = join(import.meta.dir, '.fixtures');
 const fixtures: string[] = [];

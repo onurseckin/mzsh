@@ -24,23 +24,34 @@
     "format:check": "oxfmt --check .",
     "shell:check": "bash scripts/check-shell-quality.sh",
     "line:check": "bun scripts/check-typescript-line-limits.ts",
-    "quality:check": "bun run lint && bun run format:check && bun run shell:check && bun run line:check"
+    "quality:check": "bun run lint && bun run format:check && bun run shell:check && bun run line:check",
+    "test:unit": "bun test --no-isolate tests/unit",
+    "test:integration": "bun test tests/integration",
+    "validate": "bun run quality:check && bun run build:ts && bun run test:unit && bun run test:integration",
+    "completion": "bun run test:integration --test-name-pattern completion",
+    "prepare": "lefthook install"
   },
   "dependencies": {
-    "@oclif/core": "^4.14.0",
-    "@oclif/plugin-help": "^6.3.0",
-    "chalk": "^5.6.2",
-    "fs-extra": "^11.4.0",
-    "inquirer": "^12.11.1"
+    "@oclif/core": "4.14.0",
+    "@oclif/plugin-help": "6.3.0",
+    "@opentui/core": "0.4.5",
+    "@opentui/keymap": "0.4.5",
+    "@opentui/react": "0.4.5",
+    "chalk": "5.6.2",
+    "commander": "15.0.0",
+    "fs-extra": "11.4.0",
+    "inquirer": "12.11.1",
+    "react": "19.2.8"
   },
   "devDependencies": {
-    "@types/bun": "latest",
-    "@types/fs-extra": "^11.0.4",
-    "@types/inquirer": "^9.0.10",
-    "oxfmt": "^0.65.0",
-    "oxlint": "^1.80.0",
-    "oxlint-tsgolint": "^7.0.2001",
-    "typescript": "^7.0.2"
+    "@types/bun": "1.4.0",
+    "@types/fs-extra": "11.0.4",
+    "@types/inquirer": "9.0.10",
+    "lefthook": "2.1.10",
+    "oxfmt": "0.65.0",
+    "oxlint": "1.80.0",
+    "oxlint-tsgolint": "7.0.2001",
+    "typescript": "7.0.2"
   },
   "oclif": {
     "bin": "mzsh",

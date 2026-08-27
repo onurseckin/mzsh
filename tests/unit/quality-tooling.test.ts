@@ -5,19 +5,19 @@ import {
   ROOT_TYPE_SCRIPT_FILES,
   TYPE_SCRIPT_DIRECTORIES,
   collectTypeScriptLineLimitViolations,
-} from '../scripts/check-typescript-line-limits';
+} from '../../scripts/check-typescript-line-limits';
 
-const root = resolve(import.meta.dir, '..');
+const root = resolve(import.meta.dir, '../..');
 const packageJson = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as {
   scripts: Record<string, string>;
   devDependencies: Record<string, string>;
 };
 
 test('routes JavaScript and shell quality checks through compatible compiled tools', () => {
-  expect(packageJson.devDependencies.typescript).toBe('^7.0.2');
-  expect(packageJson.devDependencies.oxlint).toBe('^1.80.0');
-  expect(packageJson.devDependencies['oxlint-tsgolint']).toBe('^7.0.2001');
-  expect(packageJson.devDependencies.oxfmt).toBe('^0.65.0');
+  expect(packageJson.devDependencies.typescript).toBe('7.0.2');
+  expect(packageJson.devDependencies.oxlint).toBe('1.80.0');
+  expect(packageJson.devDependencies['oxlint-tsgolint']).toBe('7.0.2001');
+  expect(packageJson.devDependencies.oxfmt).toBe('0.65.0');
   expect(packageJson.scripts.lint).toContain('oxlint');
   expect(packageJson.scripts.format).toContain('oxfmt');
   expect(packageJson.scripts['shell:check']).toContain('scripts/check-shell-quality.sh');

@@ -22,7 +22,7 @@ export {
   join,
 };
 
-export const repositoryRoot = resolve(import.meta.dir, '..');
+export const repositoryRoot = resolve(import.meta.dir, '../..');
 export const entrypoint = join(repositoryRoot, 'portable', 'zsh', 'init.zsh');
 const fixtureParent = join(repositoryRoot, 'tests', '.fixtures');
 const fixtures: string[] = [];

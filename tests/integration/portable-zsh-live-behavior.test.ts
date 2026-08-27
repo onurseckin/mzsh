@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from 'bun:test';
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
-const repositoryRoot = resolve(import.meta.dir, '..');
+const repositoryRoot = resolve(import.meta.dir, '../..');
 const modulesRoot = join(repositoryRoot, 'portable', 'zsh', 'modules');
 const fixtureParent = join(repositoryRoot, 'tests', '.fixtures');
 const fixtures: string[] = [];

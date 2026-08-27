@@ -40,3 +40,6 @@ temp/
 
 # OLT runtime capsules
 .olt/capsules/
+
+# Agent runtime state
+.superpowers/

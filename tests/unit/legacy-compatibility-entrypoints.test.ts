@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
-import { UpdateManager, legacyUpdateGuidance } from '../src/updateManager';
-import { SelfUninstaller, legacyUninstallGuidance } from '../src/selfUninstaller';
+import { UpdateManager, legacyUpdateGuidance } from '../../src/updateManager';
+import { SelfUninstaller, legacyUninstallGuidance } from '../../src/selfUninstaller';
 
 test('legacy compatibility entrypoints only emit fixed managed migration guidance', async () => {
   const updateOutput: string[] = [];

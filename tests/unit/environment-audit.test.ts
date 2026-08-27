@@ -1,12 +1,12 @@
 import { describe, expect, test } from 'bun:test';
-import { auditEnvironment } from '../src/application/audit-environment';
-import type { EnvironmentSnapshot } from '../src/domain/audit';
+import { auditEnvironment } from '../../src/application/audit-environment';
+import type { EnvironmentSnapshot } from '../../src/domain/audit';
 import {
   commandMetadataFromVersionResult,
   EnvironmentProbes,
   homebrewNodePresenceFromResult,
   type EnvironmentProbeDependencies,
-} from '../src/infrastructure/environment-probes';
+} from '../../src/infrastructure/environment-probes';
 
 function snapshot(overrides: Partial<EnvironmentSnapshot> = {}): EnvironmentSnapshot {
   return {

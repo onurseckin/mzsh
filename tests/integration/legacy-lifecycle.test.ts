@@ -2,7 +2,7 @@ import { afterEach, expect, test } from 'bun:test';
 import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
-const repositoryRoot = resolve(import.meta.dir, '..');
+const repositoryRoot = resolve(import.meta.dir, '../..');
 const fixtures: string[] = [];
 
 function fixture(): string {

@@ -6,7 +6,9 @@ import { join } from 'node:path';
 const fixtures: string[] = [];
 
 function fixture(): string {
-  const root = mkdtempSync(join(import.meta.dir, '.fixtures', 'local-mzsh-'));
+  const fixtureParent = join(import.meta.dir, '.fixtures');
+  mkdirSync(fixtureParent, { recursive: true });
+  const root = mkdtempSync(join(fixtureParent, 'local-mzsh-'));
   fixtures.push(root);
   mkdirSync(join(root, 'home', '.config'), { recursive: true });
   return root;
@@ -18,11 +20,11 @@ afterEach(() => {
 
 test('runs audit from a checkout through the supported package script', () => {
   const root = fixture();
-  expect(readFileSync(join(import.meta.dir, '..', 'package.json'), 'utf8')).toContain(
+  expect(readFileSync(join(import.meta.dir, '../..', 'package.json'), 'utf8')).toContain(
     '"mzsh": "bun run bin/run-standalone.ts"'
   );
   const result = spawnSync(process.execPath, ['run', 'mzsh', '--', 'audit', '--json'], {
-    cwd: join(import.meta.dir, '..'),
+    cwd: join(import.meta.dir, '../..'),
     encoding: 'utf8',
     env: {
       ...process.env,

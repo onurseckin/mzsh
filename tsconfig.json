@@ -1,6 +1,5 @@
 {
   "compilerOptions": {
-    // Environment setup & latest features
     "lib": ["ESNext"],
     "target": "ES2020",
     "module": "Preserve",
@@ -8,15 +7,12 @@
     "allowJs": true,
     "outDir": "./lib",
     "rootDir": "./src",
-
-    // Module resolution
     "moduleResolution": "bundler",
     "types": ["bun"],
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "resolveJsonModule": true,
-
-    // Best practices
+    "jsx": "react-jsx",
     "strict": true,
     "skipLibCheck": true,
     "noFallthroughCasesInSwitch": true,
@@ -24,11 +20,10 @@
     "noImplicitOverride": true,
     "forceConsistentCasingInFileNames": true,
 
-    // Some stricter flags (disabled by default)
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "noPropertyAccessFromIndexSignature": false
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "src/**/*.tsx"],
   "exclude": ["node_modules", "dist", "lib"]
 }

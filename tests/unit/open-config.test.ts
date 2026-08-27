@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { createOpenInvocation } from '../src/openConfig';
+import { createOpenInvocation } from '../../src/openConfig';
 
 test('passes terminal editor paths as one argv element without shell execution', () => {
   const path = '/safe directory/config;not-a-command.zsh';

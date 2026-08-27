@@ -1,0 +1,4 @@
+pre-commit:
+  commands:
+    quality:
+      run: bun run quality:check

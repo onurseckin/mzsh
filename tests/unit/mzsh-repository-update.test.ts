@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, test } from 'bun:test';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { planLocalInstallationUpdate } from '../src/application/update-local-installation';
-import { LocalRepository } from '../src/infrastructure/local-repository';
+import { planLocalInstallationUpdate } from '../../src/application/update-local-installation';
+import { LocalRepository } from '../../src/infrastructure/local-repository';
 
 const fixtureParent = join(import.meta.dir, '.fixtures');
 const fixtures: string[] = [];

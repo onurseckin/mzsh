@@ -22,9 +22,9 @@ export {
   writeFileSync,
   join,
 };
-export { applyAdoption } from '../src/application/apply-adoption';
-export { planAdoption } from '../src/application/plan-adoption';
-export { NodeAdoptionFilesystem } from '../src/infrastructure/adoption-filesystem';
+export { applyAdoption } from '../../src/application/apply-adoption';
+export { planAdoption } from '../../src/application/plan-adoption';
+export { NodeAdoptionFilesystem } from '../../src/infrastructure/adoption-filesystem';
 
 const fixtureParent = join(import.meta.dir, '.fixtures');
 const fixtures: string[] = [];

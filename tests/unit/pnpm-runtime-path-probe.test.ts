@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from 'bun:test';
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { inspectPnpmRuntimeDirectory } from '../src/infrastructure/pnpm-runtime-path-probe';
+import { inspectPnpmRuntimeDirectory } from '../../src/infrastructure/pnpm-runtime-path-probe';
 
 const fixtureParent = join(import.meta.dir, '.fixtures');
 const fixtures: string[] = [];

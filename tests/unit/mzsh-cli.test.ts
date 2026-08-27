@@ -1,11 +1,11 @@
 import { describe, expect, test } from 'bun:test';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { parseArguments } from '../src/cli/parse-arguments';
-import { classifySensitiveAssignment } from '../src/application/sensitive-assignment-policy';
-import { runMzshCli } from '../src/cli/run-cli';
-import type { EnvironmentSnapshot } from '../src/domain/audit';
-import { isManagedCliRoute, managedRepositoryRoot } from '../src/index';
+import { parseArguments } from '../../src/cli/parse-arguments';
+import { classifySensitiveAssignment } from '../../src/application/sensitive-assignment-policy';
+import { runMzshCli } from '../../src/cli/run-cli';
+import type { EnvironmentSnapshot } from '../../src/domain/audit';
+import { isManagedCliRoute, managedRepositoryRoot } from '../../src/index';
 
 const snapshot: EnvironmentSnapshot = {
   roots: {

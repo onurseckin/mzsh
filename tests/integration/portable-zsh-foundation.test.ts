@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from 'bun:test';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { PORTABLE_INTERACTIVE_MODULE_ORDER } from '../src/domain/portable-module-order';
+import { PORTABLE_INTERACTIVE_MODULE_ORDER } from '../../src/domain/portable-module-order';
 import * as helpers from './portable-zsh-test-helpers';
 
 const {

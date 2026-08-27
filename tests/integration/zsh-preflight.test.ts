@@ -2,9 +2,12 @@ import { afterEach, describe, expect, test } from 'bun:test';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { AdoptionPlan } from '../src/domain/adoption';
-import { renderStableLoader } from '../src/application/render-stable-loader';
-import { ZshPreflight, type ZshPreflightDependencies } from '../src/infrastructure/zsh-preflight';
+import type { AdoptionPlan } from '../../src/domain/adoption';
+import { renderStableLoader } from '../../src/application/render-stable-loader';
+import {
+  ZshPreflight,
+  type ZshPreflightDependencies,
+} from '../../src/infrastructure/zsh-preflight';
 
 const fixtures: string[] = [];
 afterEach(() =>

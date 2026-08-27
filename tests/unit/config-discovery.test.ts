@@ -1,13 +1,15 @@
 import { afterEach, expect, test } from 'bun:test';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { PORTABLE_INTERACTIVE_MODULE_ORDER } from '../src/domain/portable-module-order';
-import { FileDiscovery } from '../src/fileDiscovery';
+import { PORTABLE_INTERACTIVE_MODULE_ORDER } from '../../src/domain/portable-module-order';
+import { FileDiscovery } from '../../src/fileDiscovery';
 
 const fixtures: string[] = [];
 
 function fixture(): string {
-  const root = mkdtempSync(join(import.meta.dir, '.fixtures', 'managed-discovery-'));
+  const fixtureParent = join(import.meta.dir, '.fixtures');
+  mkdirSync(fixtureParent, { recursive: true });
+  const root = mkdtempSync(join(fixtureParent, 'managed-discovery-'));
   fixtures.push(root);
   return root;
 }

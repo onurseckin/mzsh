@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import {
   PORTABLE_INTERACTIVE_MODULE_ORDER,
   PORTABLE_LOGIN_MODULE_ORDER,
-} from '../src/domain/portable-module-order';
+} from '../../src/domain/portable-module-order';
 import * as helpers from './portable-zsh-test-helpers';
 
 const {

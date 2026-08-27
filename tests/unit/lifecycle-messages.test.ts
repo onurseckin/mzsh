@@ -1,9 +1,9 @@
 import { expect, test } from 'bun:test';
-import ZshrcManager, { checkoutLocalCommandLines } from '../src/index';
-import { appMessages } from '../src/messages/appMessages';
-import { installMessages } from '../src/messages/installMessages';
-import { uninstallMessages } from '../src/messages/uninstallMessages';
-import { updateMessages } from '../src/messages/updateMessages';
+import ZshrcManager, { checkoutLocalCommandLines } from '../../src/index';
+import { appMessages } from '../../src/messages/appMessages';
+import { installMessages } from '../../src/messages/installMessages';
+import { uninstallMessages } from '../../src/messages/uninstallMessages';
+import { updateMessages } from '../../src/messages/updateMessages';
 
 test('guides legacy lifecycle callers through the managed reversible workflow', () => {
   expect(appMessages.errors.noConfigFiles.action).toContain('bun run mzsh -- audit');
