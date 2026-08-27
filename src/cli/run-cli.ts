@@ -9,7 +9,11 @@ import { rollbackAdoption, rollbackStateDigest } from '../application/rollback-a
 import { classifySensitiveAssignment } from '../application/sensitive-assignment-policy';
 import type { AdoptionPlan, AdoptionApplyResult, AdoptionRollbackResult } from '../domain/adoption';
 import type { EnvironmentSnapshot } from '../domain/audit';
-import type { InventoryCollectionInput, InventoryRecord } from '../domain/inventory';
+import {
+  projectInventoryRecords,
+  type InventoryCollectionInput,
+  type InventoryRecord,
+} from '../domain/inventory';
 import { CategoryRegistry } from '../domain/categories';
 import { createReviewedPlan } from '../domain/action-plan';
 import { createRecoverySnapshot } from '../domain/history';
@@ -188,9 +192,10 @@ export function runMzshCli(args: readonly string[], dependencies: RunMzshCliDepe
       dependencies.write('MZSH_USAGE_inventory-unavailable');
       return 2;
     }
-    if (parsed.json) dependencies.write(JSON.stringify(records));
+    const projectedRecords = projectInventoryRecords(records);
+    if (parsed.json) dependencies.write(JSON.stringify(projectedRecords));
     else
-      for (const record of records) {
+      for (const record of projectedRecords) {
         const version = record.version === undefined ? '' : ` ${record.version}`;
         dependencies.write(`${record.categoryId} ${record.name} ${record.status}${version}`);
       }

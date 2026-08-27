@@ -4,6 +4,7 @@ import { runMzshCli } from '../../../src/cli/run-cli';
 import { CategoryRegistry } from '../../../src/domain/categories';
 import type { EnvironmentSnapshot } from '../../../src/domain/audit';
 import { InventoryProbes, type ProcessRunner } from '../../../src/infrastructure/inventory-probes';
+import type { InventoryProvider, InventoryRecord } from '../../../src/domain/inventory';
 
 class FakeProcess implements ProcessRunner {
   readonly calls: string[][] = [];
@@ -106,5 +107,46 @@ describe('inventory service', () => {
     expect(JSON.parse(output[0] ?? '[]')).toEqual([
       expect.objectContaining({ categoryId: 'runtimes', name: 'bun', version: '1.0.0' }),
     ]);
+  });
+
+  test('blocks provider-derived values and path-like data from inventory CLI output', () => {
+    const output: string[] = [];
+    const unsafeRecord: InventoryRecord = {
+      categoryId: 'runtimes',
+      name: '/private/tool-token',
+      status: 'present',
+      origin: 'path',
+      version: 'private-value',
+      metadata: { location: '/private/path', token: 'private-value' },
+    };
+    const unsafeProvider: InventoryProvider = { collect: () => [unsafeRecord] };
+
+    expect(
+      runMzshCli(['inventory', '--json'], {
+        home: '/isolated/home',
+        xdgConfig: '/isolated/home/.config',
+        xdgCache: '/isolated/home/.cache',
+        repositoryRoot: '/isolated/repository',
+        probes: { collect: snapshot },
+        inventory: { collect: () => unsafeProvider.collect({}) },
+        write: (message) => output.push(message),
+      })
+    ).toBe(0);
+    expect(output).toEqual(['[]']);
+    expect(output.join('\n')).not.toContain('/private/path');
+    expect(output.join('\n')).not.toContain('private-value');
+    output.splice(0);
+    expect(
+      runMzshCli(['inventory'], {
+        home: '/isolated/home',
+        xdgConfig: '/isolated/home/.config',
+        xdgCache: '/isolated/home/.cache',
+        repositoryRoot: '/isolated/repository',
+        probes: { collect: snapshot },
+        inventory: { collect: () => unsafeProvider.collect({}) },
+        write: (message) => output.push(message),
+      })
+    ).toBe(0);
+    expect(output).toEqual([]);
   });
 });

@@ -21,7 +21,7 @@ export class CategoryRegistry {
   constructor(entries: readonly InventoryCategory[]) {
     for (const entry of entries) {
       if (this.categories.has(entry.id)) throw new Error('Duplicate inventory category');
-      this.categories.set(entry.id, { ...entry });
+      this.categories.set(entry.id, Object.freeze({ ...entry }));
     }
   }
 
@@ -30,12 +30,14 @@ export class CategoryRegistry {
   }
 
   list(): readonly InventoryCategory[] {
-    return [...this.categories.values()];
+    return Object.freeze(
+      [...this.categories.values()].map((category) => Object.freeze({ ...category }))
+    );
   }
 
   require(id: InventoryCategoryId): InventoryCategory {
     const category = this.categories.get(id);
     if (category === undefined) throw new Error('Unknown inventory category');
-    return category;
+    return Object.freeze({ ...category });
   }
 }

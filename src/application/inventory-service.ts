@@ -1,4 +1,5 @@
 import { CategoryRegistry } from '../domain/categories';
+import { projectInventoryRecords } from '../domain/inventory';
 import type {
   InventoryCollectionInput,
   InventoryProvider,
@@ -72,7 +73,7 @@ export function collectInventory(
     ...snapshotRecords(input),
     ...providers.flatMap((provider) => provider.collect(input)),
   ];
-  return records.filter(
+  return projectInventoryRecords(records).filter(
     (record) =>
       registry.has(record.categoryId) &&
       (input.categoryId === undefined || record.categoryId === input.categoryId)

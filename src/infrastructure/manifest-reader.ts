@@ -1,5 +1,9 @@
 import { readFileSync } from 'node:fs';
-import type { InventoryCategory, InventoryCategoryId } from '../domain/categories';
+import {
+  inventoryCategoryIds,
+  type InventoryCategory,
+  type InventoryCategoryId,
+} from '../domain/categories';
 
 export interface MachineManifest {
   version: 1;
@@ -8,10 +12,7 @@ export interface MachineManifest {
 
 function isCategoryId(value: unknown): value is InventoryCategoryId {
   return (
-    typeof value === 'string' &&
-    ['applications', 'runtimes', 'managers', 'shell', 'scripts', 'path', 'environment'].includes(
-      value
-    )
+    typeof value === 'string' && inventoryCategoryIds.some((categoryId) => categoryId === value)
   );
 }
 
@@ -29,13 +30,16 @@ export function parseMachineManifest(value: unknown): MachineManifest {
   if (
     candidate.version !== 1 ||
     !Array.isArray(candidate.categories) ||
-    !candidate.categories.every(isCategory)
+    !candidate.categories.every(isCategory) ||
+    candidate.categories.length !== inventoryCategoryIds.length ||
+    candidate.categories.some((category, index) => category.id !== inventoryCategoryIds[index])
   )
     throw new Error('Invalid machine manifest');
-  return {
+  const categories = candidate.categories.map((category) => Object.freeze({ ...category }));
+  return Object.freeze({
     version: 1,
-    categories: candidate.categories.map((category) => ({ ...category })),
-  };
+    categories: Object.freeze(categories),
+  });
 }
 
 export function readMachineManifest(path: string): MachineManifest {
