@@ -19,3 +19,10 @@
 - Added a read-only plan lookup for unknown apply requests, removed absolute paths from lifecycle output, and fetches after a clean preflight even when tracking metadata is current.
 - Reworked shell reconciliation to preflight every loader before writes and to recover already-written loaders if a later atomic write fails.
 - Added lifecycle fixtures covering reviewed setup/update gates, stale remote state, invalid apply no-write behavior, output redaction, and loader preflight.
+
+## Review fix round 2
+
+- Reproduced an adoption filesystem failure that replaces a loader and then throws: the failed loader was left changed because recovery only tracked completed writes.
+- Registered each pending loader for recovery before its atomic write and added an injected post-replace failure fixture that verifies all preflight contents are restored.
+- RED: `bun test tests/integration/setup/setup-fixture.test.ts` produced 2 pass, 1 fail with the failed loader retaining rendered content.
+- GREEN: the focused test produced 3 pass, 0 fail; `bun run build:ts` and `bun run validate` passed with 92 unit and 85 integration tests; `git diff --check` passed.

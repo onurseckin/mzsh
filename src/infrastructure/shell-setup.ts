@@ -50,8 +50,8 @@ export class ShellSetup implements ShellReconciler {
     const applied: LoaderPreflight[] = [];
     try {
       for (const entry of changes) {
-        this.filesystem.writeAtomic(entry.path, entry.expected, 0o600);
         applied.push(entry);
+        this.filesystem.writeAtomic(entry.path, entry.expected, 0o600);
       }
     } catch (error) {
       this.recover(applied);
