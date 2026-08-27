@@ -124,7 +124,6 @@ export class SetupService {
   private updateOperations(root: string): SetupOperationsResult {
     const safety = inspectRepositorySafety(root, this.dependencies.git);
     if (safety.kind === 'blocked') return safety;
-    if (safety.behind === 0) return [];
     if (!this.dependencies.git.canFastForward(root))
       return { kind: 'blocked', code: 'REPOSITORY_DIVERGED' };
     return [{ kind: 'fast-forward', root }];
@@ -133,7 +132,6 @@ export class SetupService {
   private applyFastForward(root: string): UpdateResult {
     const safety = inspectRepositorySafety(root, this.dependencies.git);
     if (safety.kind === 'blocked') return safety;
-    if (safety.behind === 0) return { kind: 'applied', root, evidence: ['repository-current'] };
     if (!this.dependencies.git.canFastForward(root))
       return { kind: 'blocked', code: 'REPOSITORY_DIVERGED' };
     this.dependencies.git.fetch(root);
@@ -141,11 +139,13 @@ export class SetupService {
     if (fetchedSafety.kind === 'blocked') return fetchedSafety;
     if (!this.dependencies.git.canFastForward(root))
       return { kind: 'blocked', code: 'REPOSITORY_DIVERGED' };
+    if (fetchedSafety.behind === 0)
+      return { kind: 'applied', root, evidence: ['repository-current'] };
     this.dependencies.git.pullFastForward(root);
     return { kind: 'applied', root, evidence: ['repository-fast-forwarded'] };
   }
 }
 
-export function setupPlanFingerprint(plan: SetupPlan): string {
+export function setupPlanFingerprint(plan: object): string {
   return createHash('sha256').update(JSON.stringify(plan)).digest('hex');
 }

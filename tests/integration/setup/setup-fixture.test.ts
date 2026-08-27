@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from 'bun:test';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ShellSetup } from '../../../src/infrastructure/shell-setup';
 
@@ -30,4 +30,15 @@ test('reconciles stable shell loaders idempotently within an isolated home fixtu
   expect(loader).toContain('# mzsh-managed-loader');
   expect(shell.reconcile(repository)).toBe('shell-already-reconciled');
   expect(readFileSync(join(home, '.zshrc'), 'utf8')).toBe(loader);
+});
+
+test('preflights every loader before writing any managed loader', () => {
+  const root = fixture();
+  const home = join(root, 'home');
+  const repository = join(root, 'repository');
+  writeFileSync(join(home, '.zprofile'), 'unowned loader\n', { mode: 0o600 });
+
+  expect(() => new ShellSetup(home).reconcile(repository)).toThrow('SHELL_LOADER_UNOWNED');
+  expect(existsSync(join(home, '.zshenv'))).toBe(false);
+  expect(existsSync(join(home, '.zshrc'))).toBe(false);
 });

@@ -207,10 +207,9 @@ describe('MZSH managed CLI', () => {
     }
   });
 
-  test('update and rollback require reviewed plan confirmation for apply', () => {
+  test('rollback requires reviewed plan confirmation for apply', () => {
     const fixture = cliFixture();
     try {
-      let applied = 0;
       const rollbackPaths: string[] = [];
       const dependencies = {
         home: fixture.home,
@@ -218,13 +217,8 @@ describe('MZSH managed CLI', () => {
         xdgCache: join(fixture.home, '.cache'),
         repositoryRoot: fixture.repository,
         write: (_message: string) => undefined,
-        id: () => 'update-tx',
         reviewedPlanId: () => '4b5fd2fd-2f80-4ce9-a8f3-5c12dfacbe50',
         rollbackStateDigest: () => 'a'.repeat(64),
-        apply: () => {
-          applied += 1;
-          return { kind: 'applied' as const, receiptPath: 'receipt' };
-        },
         rollback: (input: { receiptPath: string; dryRun: boolean }) => {
           rollbackPaths.push(`${input.receiptPath}:${input.dryRun}`);
           return input.dryRun
@@ -232,27 +226,6 @@ describe('MZSH managed CLI', () => {
             : { kind: 'rolled-back' as const, paths: [] };
         },
       };
-      expect(runMzshCli(['update', '--source', fixture.repository], dependencies)).toBe(0);
-      expect(applied).toBe(0);
-      expect(runMzshCli(['update', '--source', fixture.repository, '--apply'], dependencies)).toBe(
-        1
-      );
-      expect(
-        runMzshCli(
-          [
-            'update',
-            '--source',
-            fixture.repository,
-            '--apply',
-            '--plan-id',
-            '4b5fd2fd-2f80-4ce9-a8f3-5c12dfacbe50',
-            '--confirm',
-            'APPLY',
-          ],
-          dependencies
-        )
-      ).toBe(0);
-      expect(applied).toBe(1);
       expect(runMzshCli(['rollback', 'receipt_1'], dependencies)).toBe(0);
       expect(runMzshCli(['rollback', 'receipt_1', '--apply'], dependencies)).toBe(1);
       expect(

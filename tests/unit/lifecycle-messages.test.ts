@@ -9,7 +9,7 @@ test('guides legacy lifecycle callers through the managed reversible workflow', 
   expect(appMessages.errors.noConfigFiles.action).toContain('bun run mzsh -- audit');
   expect(appMessages.help.usage).toBe('bun run mzsh -- <command> [OPTIONS]');
   expect(appMessages.help.options.update).toBe(
-    'bun run mzsh -- update [--source /absolute/checkout] [--apply] [--plan-id reviewed-plan-id] [--confirm APPLY]  Plan or apply a local managed update.'
+    'bun run mzsh -- update [--apply] [--plan-id reviewed-plan-id] [--confirm APPLY]  Plan or apply a local managed update.'
   );
   expect(appMessages.help.options.bootstrap).toBe(
     'bun run mzsh -- bootstrap --source /absolute/checkout [--legacy-source /absolute/file] [--apply] [--plan-id reviewed-plan-id] [--confirm APPLY]  Plan or apply initial managed-shell adoption.'
@@ -20,7 +20,7 @@ test('guides legacy lifecycle callers through the managed reversible workflow', 
   expect(appMessages.help.examples).toEqual([
     'bun run mzsh -- audit [--source /absolute/checkout] [--json]',
     'bun run mzsh -- bootstrap --source /absolute/checkout [--legacy-source /absolute/file] [--apply] [--plan-id reviewed-plan-id] [--confirm APPLY]',
-    'bun run mzsh -- update [--source /absolute/checkout] [--apply] [--plan-id reviewed-plan-id] [--confirm APPLY]',
+    'bun run mzsh -- update [--apply] [--plan-id reviewed-plan-id] [--confirm APPLY]',
     'bun run mzsh -- rollback receipt-id [--apply] [--plan-id reviewed-plan-id] [--confirm APPLY]',
     'bun run mzsh -- setup [--apply] [--plan-id reviewed-plan-id] [--confirm APPLY]',
     'bun run mzsh -- inventory [category] [--json]',
@@ -43,7 +43,7 @@ test('guides legacy lifecycle callers through the managed reversible workflow', 
   expect(ZshrcManager.examples).toEqual([
     'bun run mzsh -- audit [--source /absolute/checkout] [--json]',
     'bun run mzsh -- bootstrap --source /absolute/checkout [--legacy-source /absolute/file] [--apply] [--plan-id reviewed-plan-id] [--confirm APPLY]',
-    'bun run mzsh -- update [--source /absolute/checkout] [--apply] [--plan-id reviewed-plan-id] [--confirm APPLY]',
+    'bun run mzsh -- update [--apply] [--plan-id reviewed-plan-id] [--confirm APPLY]',
     'bun run mzsh -- rollback receipt-id [--apply] [--plan-id reviewed-plan-id] [--confirm APPLY]',
     'bun run mzsh -- setup [--apply] [--plan-id reviewed-plan-id] [--confirm APPLY]',
     'bun run mzsh -- inventory [category] [--json]',
@@ -52,7 +52,7 @@ test('guides legacy lifecycle callers through the managed reversible workflow', 
   expect(checkoutLocalCommandLines).toEqual([
     '  bun run mzsh -- audit [--source /absolute/checkout] [--json]',
     '  bun run mzsh -- bootstrap --source /absolute/checkout [--legacy-source /absolute/file] [--apply] [--plan-id reviewed-plan-id] [--confirm APPLY]',
-    '  bun run mzsh -- update [--source /absolute/checkout] [--apply] [--plan-id reviewed-plan-id] [--confirm APPLY]',
+    '  bun run mzsh -- update [--apply] [--plan-id reviewed-plan-id] [--confirm APPLY]',
     '  bun run mzsh -- rollback receipt-id [--apply] [--plan-id reviewed-plan-id] [--confirm APPLY]',
     '  bun run mzsh -- setup [--apply] [--plan-id reviewed-plan-id] [--confirm APPLY]',
     '  bun run mzsh -- inventory [category] [--json]',

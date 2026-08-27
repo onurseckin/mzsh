@@ -3,7 +3,7 @@ export const updateMessages = {
     updateFailed: {
       message: 'Managed local update was not applied',
       action:
-        'Inspect the local checkout and retry only after review:\n  • bun run mzsh -- audit\n  • bun run mzsh -- update --source /absolute/mzsh-checkout\n  • capture reviewedPlanId, then add --apply --plan-id reviewed-plan-id --confirm APPLY',
+        'Inspect the local checkout and retry only after review:\n  • bun run mzsh -- audit\n  • bun run mzsh -- update\n  • capture reviewedPlanId, then add --apply --plan-id reviewed-plan-id --confirm APPLY',
       code: 'UPDATE_001',
     },
     bootstrapFailed: {
@@ -15,7 +15,7 @@ export const updateMessages = {
     repositoryUnavailable: {
       message: 'Local checkout is unavailable for update planning',
       action:
-        'MZSH does not fetch during managed update. Provide an existing local checkout with --source and rerun audit.',
+        'MZSH updates only the managed local checkout after a reviewed plan and clean safety checks.',
       code: 'UPDATE_003',
     },
   },

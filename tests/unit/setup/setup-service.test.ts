@@ -12,7 +12,7 @@ class FakeGit implements SetupGit {
 
   constructor(
     private readonly status = '',
-    private readonly relation = '0\t0\n',
+    private relation = '0\t0\n',
     private readonly fastForward = true
   ) {}
 
@@ -41,6 +41,10 @@ class FakeGit implements SetupGit {
 
   clone(_source: string, _target: string): void {
     this.calls.push(['clone']);
+  }
+
+  setRelation(value: string): void {
+    this.relation = value;
   }
 }
 
@@ -127,6 +131,28 @@ describe('setup service', () => {
       operations: [{ kind: 'fast-forward', root: '/home/fixture/repos/mzsh' }],
     });
     expect(git.calls).not.toContainEqual(['fetch', 'origin']);
+  });
+
+  test('fetches after a clean current tracking state before deciding no update is needed', () => {
+    const git = new FakeGit('', '0\t0\n');
+    const service = new SetupService({
+      home: '/home/fixture',
+      repository: new FakeRepository(),
+      git,
+    });
+    const originalFetch = git.fetch.bind(git);
+    git.fetch = (root: string): void => {
+      originalFetch(root);
+      git.setRelation('1\t0\n');
+    };
+
+    expect(service.applyUpdate()).toEqual({
+      kind: 'applied',
+      root: '/home/fixture/repos/mzsh',
+      evidence: ['repository-fast-forwarded'],
+    });
+    expect(git.calls).toContainEqual(['fetch', 'origin']);
+    expect(git.calls).toContainEqual(['pull', '--ff-only']);
   });
 
   test('applies each reviewed setup operation in its serialized order', () => {

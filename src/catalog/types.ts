@@ -98,7 +98,7 @@ export type ManagedCommand =
   | { kind: 'env'; action: 'set'; name: string; json: boolean }
   | (MutationCommand & { kind: 'setup' })
   | (MutationCommand & { kind: 'bootstrap'; source: string; legacySource?: string })
-  | (MutationCommand & { kind: 'update'; source?: string })
+  | (MutationCommand & { kind: 'update' })
   | (MutationCommand & { kind: 'rollback'; receiptId: string });
 
 export interface MutationCommand {

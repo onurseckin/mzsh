@@ -7,8 +7,6 @@ describe('Commander catalog adapter', () => {
     expect(
       parseCommanderArgs([
         'update',
-        '--source',
-        '/checkout',
         '--apply',
         '--plan-id',
         '4b5fd2fd-2f80-4ce9-a8f3-5c12dfacbe49',
@@ -17,7 +15,6 @@ describe('Commander catalog adapter', () => {
       ])
     ).toEqual({
       kind: 'update',
-      source: '/checkout',
       apply: true,
       planId: '4b5fd2fd-2f80-4ce9-a8f3-5c12dfacbe49',
       confirmation: 'APPLY',

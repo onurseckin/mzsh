@@ -26,7 +26,7 @@ import { readMachineManifest } from '../infrastructure/manifest-reader';
 import { ZshPreflight } from '../infrastructure/zsh-preflight';
 import { parseArguments } from './parse-arguments';
 import { runEnvironmentCommand } from './environment-command';
-import { runSetupCommand } from './setup-command';
+import { runLifecycleCommand } from './setup-command';
 
 type PreflightResult =
   | { kind: 'passed' }
@@ -169,7 +169,8 @@ export function runMzshCli(args: readonly string[], dependencies: RunMzshCliDepe
     return 2;
   }
   if (parsed.kind === 'env') return runEnvironmentCommand(parsed, dependencies);
-  if (parsed.kind === 'setup') return runSetupCommand(parsed, dependencies);
+  if (parsed.kind === 'setup' || parsed.kind === 'update')
+    return runLifecycleCommand(parsed, dependencies);
   const filesystem = dependencies.filesystem ?? new NodeAdoptionFilesystem();
   if (parsed.kind === 'audit') {
     const repositoryRoot = parsed.source ?? dependencies.repositoryRoot;
@@ -286,8 +287,7 @@ export function runMzshCli(args: readonly string[], dependencies: RunMzshCliDepe
       history.close();
     }
   }
-  const repository =
-    parsed.kind === 'bootstrap' ? parsed.source : (parsed.source ?? dependencies.repositoryRoot);
+  const repository = parsed.kind === 'bootstrap' ? parsed.source : dependencies.repositoryRoot;
   const legacySource = parsed.kind === 'bootstrap' ? parsed.legacySource : undefined;
   const planned = planAdoption(
     {

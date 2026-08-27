@@ -84,7 +84,7 @@ const commands: readonly CatalogCommand[] = [
     palette: { keywords: ['update', 'plan'] },
     parser: {
       kind: 'update',
-      flags: [sourceFlag, applyFlag, planIdFlag, confirmFlag],
+      flags: [applyFlag, planIdFlag, confirmFlag],
       positional: 'none',
     },
   },
@@ -317,7 +317,6 @@ export function parseCatalogArgs(args: readonly string[]): CatalogParseResult {
     return positionals.length === 0
       ? {
           kind: 'update',
-          ...(typeof source === 'string' ? { source } : {}),
           apply,
           ...(typeof planId === 'string' ? { planId } : {}),
           ...(typeof confirmation === 'string' ? { confirmation } : {}),

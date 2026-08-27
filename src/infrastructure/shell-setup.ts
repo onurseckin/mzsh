@@ -7,6 +7,12 @@ import { NodeAdoptionFilesystem } from './adoption-filesystem';
 const loaderNames = ['.zshenv', '.zprofile', '.zshrc'] as const;
 const managedMarker = '# mzsh-managed-loader\n';
 
+interface LoaderPreflight {
+  path: string;
+  expected: string;
+  current: string | undefined;
+}
+
 export interface BunLinkProcess {
   run(root: string): number;
 }
@@ -34,16 +40,31 @@ export class ShellSetup implements ShellReconciler {
 
   reconcile(_root: string): string {
     if (!this.filesystem.hasSafeOwnedRoot(this.home)) throw new Error('SHELL_HOME_UNSAFE');
-    let changed = false;
-    for (const loader of loaderNames) {
-      const path = join(this.home, loader);
-      const expected = renderStableLoader(loader);
-      const current = this.current(path);
-      if (current === expected) continue;
-      this.filesystem.writeAtomic(path, expected, 0o600);
-      changed = true;
+    const preflight = loaderNames.map((loader) => ({
+      path: join(this.home, loader),
+      expected: renderStableLoader(loader),
+      current: this.current(join(this.home, loader)),
+    }));
+    const changes = preflight.filter((entry) => entry.current !== entry.expected);
+    if (changes.length === 0) return 'shell-already-reconciled';
+    const applied: LoaderPreflight[] = [];
+    try {
+      for (const entry of changes) {
+        this.filesystem.writeAtomic(entry.path, entry.expected, 0o600);
+        applied.push(entry);
+      }
+    } catch (error) {
+      this.recover(applied);
+      throw error;
     }
-    return changed ? 'shell-reconciled' : 'shell-already-reconciled';
+    return 'shell-reconciled';
+  }
+
+  private recover(entries: readonly LoaderPreflight[]): void {
+    for (const entry of [...entries].reverse()) {
+      if (entry.current === undefined) this.filesystem.remove(entry.path);
+      else this.filesystem.writeAtomic(entry.path, entry.current, 0o600);
+    }
   }
 
   private current(path: string): string | undefined {

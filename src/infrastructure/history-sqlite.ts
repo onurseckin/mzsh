@@ -1,4 +1,5 @@
 import { Database } from 'bun:sqlite';
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { isReviewedPlanId, type ReviewedPlan, type ReviewedPlanMatch } from '../domain/action-plan';
 import type {
@@ -172,6 +173,34 @@ export class SqliteHistory implements DurablePlanStore, HistoryStore {
 
   private enforceRetention(now = new Date()): void {
     this.prune(new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000));
+  }
+}
+
+export function findExistingReviewedPlan(directory: string, id: string): ReviewedPlan | undefined {
+  const databasePath = join(directory, 'history.sqlite');
+  if (!existsSync(databasePath)) return undefined;
+  const database = new Database(databasePath, { readonly: true, strict: true });
+  try {
+    const row = database
+      .query<PlanRow, [string]>(
+        'SELECT id, action, target_names, fingerprint, created_at FROM reviewed_plans WHERE id = ?'
+      )
+      .get(id);
+    if (row === null) return undefined;
+    const targetNames = parseTargetNames(row.target_names);
+    if (targetNames === undefined) return undefined;
+    const plan: ReviewedPlan = {
+      schema: 'mzsh.reviewed-plan/v1',
+      id: row.id,
+      action: row.action,
+      targetNames,
+      fingerprint: row.fingerprint,
+      state: 'reviewed',
+      createdAt: row.created_at,
+    };
+    return isReviewedPlan(plan) ? plan : undefined;
+  } finally {
+    database.close();
   }
 }
 
