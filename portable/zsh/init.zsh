@@ -18,11 +18,11 @@ typeset -a mzsh_init_owned_scalar_variables=(
   HISTFILE HISTSIZE SAVEHIST _mzsh_history_clean_stamp
 )
 typeset -a mzsh_init_owned_array_variables=(
-  MZSH_LOADED_MODULES MZSH_PATH_SHIMS MZSH_PATH_APPLICATIONS plugins precmd_functions
+  MZSH_LOADED_MODULES MZSH_PATH_SHIMS MZSH_PATH_RUNTIMES MZSH_PATH_APPLICATIONS plugins precmd_functions
 )
 typeset -a mzsh_init_owned_aliases=(rm del y ls tree weztermlua vim vi tldrconfig h)
 typeset -a mzsh_init_owned_functions=(
-  mzsh_observe mzsh_path_add_shim mzsh_path_add_application mzsh_path_canonicalize
+  mzsh_observe mzsh_path_add_shim mzsh_path_add_runtime mzsh_path_add_application mzsh_path_canonicalize
   mzsh_path_finalize mzsh_completion_add_directory mzsh_completion_initialize
   mzsh_private_mode mzsh_private_owner zvm_after_init n
   _mzsh_history_cleaner_precmd_hook history-cleaner history-reload

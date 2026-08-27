@@ -1,57 +1,40 @@
-/**
- * Uninstallation Messages
- * Centralized messages for uninstallation process
- */
-
 export const uninstallMessages = {
-  // Error messages with actionable guidance
   errors: {
     stillFound: {
-      message: 'Uninstallation failed - mzsh still found',
+      message: 'Legacy global uninstall is retired',
       action:
-        'Manual removal required. Try these commands:\n  • sudo rm -f [PATH_TO_MZSH]\n  • Check for multiple installations in different locations\n  • Verify you have sufficient permissions',
+        'Recover only through a recorded transaction:\n  • bun run mzsh -- rollback receipt-id\n  • bun run mzsh -- rollback receipt-id --apply\n  • retain protected backups until the receipt is unavailable',
       code: 'UNINSTALL_001',
     },
-    npmRemovalFailed: {
-      message: 'Failed to remove npm global installation',
+    receiptUnavailable: {
+      message: 'Managed rollback receipt is unavailable',
       action:
-        'Remove manually with elevated permissions:\n  • sudo npm uninstall -g mzsh\n  • Or check npm global directory permissions',
+        'Run a dry audit, select an available receipt, and apply rollback only after reviewing its protected backup state.',
       code: 'UNINSTALL_002',
     },
     permissionDenied: {
-      message: 'Permission denied during uninstallation',
+      message: 'Managed rollback requires owner-controlled state',
       action:
-        'Some files require elevated permissions:\n  • Try running with sudo for system-wide installations\n  • Check file ownership and permissions\n  • Ensure you have write access to installation directories',
+        'Do not use elevated deletion. Restore owner-only permissions on the managed state directory and rerun rollback dry-run.',
       code: 'UNINSTALL_003',
     },
   },
-
-  // Success messages (minimal)
   success: {
-    completed: '🎉 mzsh uninstallation completed!',
-    systemClean: 'mzsh has been successfully uninstalled from your system!',
+    completed: 'Managed rollback completed.',
+    transactionRestored: 'The selected managed transaction has been restored.',
   },
-
-  // Info messages
   info: {
-    starting: '🗑️  Uninstalling mzsh...',
-    pathPreserved: 'Your bun PATH configuration has been preserved for other packages',
-    shellRefresh: 'Starting new shell session to apply changes...',
-    refreshingEnvironment: 'Refreshing environment to apply removal...',
-    systemRemoved: 'mzsh has been completely removed from your system',
+    starting: 'Planning managed rollback...',
+    pathPreserved: 'Rollback restores recorded files without global package deletion.',
+    shellRefresh: 'Open a new shell after an applied rollback.',
+    refreshingEnvironment: 'Managed rollback does not source live shell files.',
   },
-
-  // Summary structure
   summary: {
-    title: 'Uninstallation Summary:',
+    title: 'Managed rollback summary:',
     items: {
-      bunLink: 'Bun link: Removed',
-      npmGlobal: 'npm global: Checked and removed if found',
-      binaryFiles: 'Binary files: {count} removed',
-      packageDirs: 'Package directories: {count} removed',
-      installerComments: 'mzsh installer comments: {count} cleaned',
-      bunPath: 'bun PATH configuration: Preserved',
-      verification: 'Command verification: Passed',
+      receipt: 'Receipt: reviewed',
+      backups: 'Protected backups: verified',
+      verification: 'Managed target verification: passed',
     },
   },
 } as const;

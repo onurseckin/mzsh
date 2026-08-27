@@ -84,6 +84,7 @@ describe('portable Zsh runtime and completion', () => {
     const result = runEntrypoint(fixture);
     const lines = outputOf(result).trim().split('\n');
 
+    expect(errorOutputOf(result)).toBe('');
     expect(result.exitCode).toBe(0);
     expect(lines).toEqual([
       `PATH=${[
@@ -193,6 +194,61 @@ describe('portable Zsh runtime and completion', () => {
     expect(outputOf(result)).toContain('NVM_POLICY=existing-installation-only\n');
     expect(outputOf(result)).toContain('NVM_LOADER=1\n');
     expect(outputOf(result)).toContain('NVM_PROJECT_SELECTION=available\n');
+  });
+
+  test('keeps an existing NVM-selected runtime ahead of Homebrew dependency Node', () => {
+    const fixture = createFixture();
+    for (const directory of [
+      'home',
+      'system',
+      'shims',
+      'homebrew/bin',
+      'homebrew/sbin',
+      'nvm/versions/node/lts/bin',
+    ]) {
+      makeDirectory(fixture, directory);
+    }
+    const nvmDirectory = join(fixture, 'nvm');
+    writeFileSync(
+      join(nvmDirectory, 'nvm.sh'),
+      'export NVM_BIN="$NVM_DIR/versions/node/lts/bin"\n'
+    );
+
+    const result = Bun.spawnSync(
+      [
+        zshPath,
+        '-fc',
+        'function compinit() { return 0 }; source "$MZSH_ENTRYPOINT" || exit 1; print -r -- "PATH=$PATH"',
+      ],
+      {
+        cwd: fixture,
+        env: {
+          ...portableEnvironment(),
+          HOME: join(fixture, 'home'),
+          PATH: `${join(fixture, 'system')}:/usr/bin:/bin`,
+          FPATH: '',
+          MZSH_ENTRYPOINT: entrypoint,
+          MZSH_COMMAND_SHIM_DIR: join(fixture, 'shims'),
+          MZSH_HOMEBREW_PREFIX: join(fixture, 'homebrew'),
+          NVM_DIR: nvmDirectory,
+          BUN_INSTALL: '',
+          CARGO_HOME: join(fixture, 'missing-cargo'),
+          ANDROID_HOME: '',
+          ANDROID_SDK_ROOT: '',
+          MZSH_OH_MY_ZSH_ROOT: '',
+          MZSH_DOCKER_COMPLETION_DIR: '',
+          MZSH_PRIVATE_ZSH: join(fixture, 'missing-private.zsh'),
+        },
+        stdout: 'pipe',
+        stderr: 'pipe',
+      }
+    );
+
+    expect(errorOutputOf(result)).toBe('');
+    expect(result.exitCode).toBe(0);
+    expect(outputOf(result)).toContain(
+      `PATH=${join(fixture, 'shims')}:${join(fixture, 'nvm', 'versions', 'node', 'lts', 'bin')}:${join(fixture, 'homebrew', 'bin')}`
+    );
   });
 
   test('uses the MZSH completion fallback exactly once when Oh My Zsh is absent', () => {

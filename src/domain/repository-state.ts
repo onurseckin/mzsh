@@ -1,25 +1,25 @@
 export type RepositoryInvalidCode =
-  | "repository-root-not-absolute"
-  | "repository-root-not-directory"
-  | "package-metadata-missing"
-  | "package-metadata-invalid"
-  | "package-identity-mismatch"
-  | "portable-entrypoint-missing";
+  | 'repository-root-not-absolute'
+  | 'repository-root-not-directory'
+  | 'package-metadata-missing'
+  | 'package-metadata-invalid'
+  | 'package-identity-mismatch'
+  | 'portable-entrypoint-missing';
 
 export type RepositoryState =
   | {
-      kind: "present";
+      kind: 'present';
       root: string;
-      packageName: "mzsh";
+      packageName: 'mzsh';
       portableEntrypoint: string;
     }
   | {
-      kind: "missing";
+      kind: 'missing';
       root: string;
-      reason: "root-absent";
+      reason: 'root-absent';
     }
   | {
-      kind: "invalid";
+      kind: 'invalid';
       root: string;
       code: RepositoryInvalidCode;
       message: string;
@@ -27,14 +27,14 @@ export type RepositoryState =
 
 export type LocalInstallationUpdate =
   | {
-      kind: "ready";
+      kind: 'ready';
       root: string;
       portableEntrypoint: string;
-      action: "local-update-ready";
+      action: 'local-update-ready';
     }
   | {
-      kind: "prerequisite-required";
+      kind: 'prerequisite-required';
       root: string;
-      reason: "repository-missing" | "repository-invalid";
+      reason: 'repository-missing' | 'repository-invalid';
       message: string;
     };

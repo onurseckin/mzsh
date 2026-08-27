@@ -1,6 +1,7 @@
 # PATH is assembled once at the end so that duplicate removal cannot change
 # the explicit module order or let a later machine-specific export win.
 typeset -ga MZSH_PATH_SHIMS=()
+typeset -ga MZSH_PATH_RUNTIMES=()
 typeset -ga MZSH_PATH_APPLICATIONS=()
 
 function mzsh_path_add_shim() {
@@ -13,6 +14,12 @@ function mzsh_path_add_application() {
   emulate -L zsh
   [[ $# -eq 1 && -d $1 ]] || return 0
   MZSH_PATH_APPLICATIONS+=("$1")
+}
+
+function mzsh_path_add_runtime() {
+  emulate -L zsh
+  [[ $# -eq 1 && -d $1 ]] || return 0
+  MZSH_PATH_RUNTIMES+=("$1")
 }
 
 function mzsh_path_canonicalize() {
@@ -39,6 +46,7 @@ function mzsh_path_finalize() {
 
   candidates=(
     "${MZSH_PATH_SHIMS[@]}"
+    "${MZSH_PATH_RUNTIMES[@]}"
     "${MZSH_PATH_APPLICATIONS[@]}"
     "${(@s/:/)PATH}"
   )

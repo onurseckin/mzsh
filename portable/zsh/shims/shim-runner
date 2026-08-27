@@ -2,31 +2,46 @@
 command_name=${0##*/}
 shim_directory=${0%/*}
 [ "$shim_directory" = "$0" ] && shim_directory=.
-shim_directory=$(CDPATH= cd -P "$shim_directory" && pwd -P) || exit 127
+shim_directory=$( (
+	CDPATH=
+	export CDPATH
+	cd -P "$shim_directory" && pwd -P
+)) || exit 127
 "$shim_directory/check-prohibited" "$0" "$@" || exit $?
 old_path=$PATH
-PATH=
+filtered_path=
 remaining_path=$old_path
 while :; do
-  case $remaining_path in
-    *:*) path_entry=${remaining_path%%:*}; remaining_path=${remaining_path#*:} ;;
-    *) path_entry=$remaining_path; remaining_path= ;;
-  esac
-  canonical_entry=$(CDPATH= cd -P "$path_entry" 2>/dev/null && pwd -P) || canonical_entry=$path_entry
-  [ "$canonical_entry" = "$shim_directory" ] && continue
-  [ -z "$PATH" ] || PATH=$PATH:
-  PATH=$PATH$path_entry
-  [ -n "$remaining_path" ] || break
+	case $remaining_path in
+	*:*)
+		path_entry=${remaining_path%%:*}
+		remaining_path=${remaining_path#*:}
+		;;
+	*)
+		path_entry=$remaining_path
+		remaining_path=
+		;;
+	esac
+	canonical_entry=$( (
+		CDPATH=
+		export CDPATH
+		cd -P "$path_entry" 2>/dev/null && pwd -P
+	)) || canonical_entry=$path_entry
+	[ "$canonical_entry" = "$shim_directory" ] && continue
+	[ -z "$filtered_path" ] || filtered_path=$filtered_path:
+	filtered_path=$filtered_path$path_entry
+	[ -n "$remaining_path" ] || break
 done
-export PATH
-real_command=$(command -v "$command_name")
-PATH=$old_path
-export PATH
+real_command=$(PATH="$filtered_path" command -v "$command_name")
 [ -n "$real_command" ] || exit 127
 case $real_command in
-  /*) real_directory=${real_command%/*} ;;
-  *) real_directory=$PWD/${real_command%/*} ;;
+/*) real_directory=${real_command%/*} ;;
+*) real_directory=$PWD/${real_command%/*} ;;
 esac
-canonical_real_directory=$(CDPATH= cd -P "$real_directory" 2>/dev/null && pwd -P) || exit 127
+canonical_real_directory=$( (
+	CDPATH=
+	export CDPATH
+	cd -P "$real_directory" 2>/dev/null && pwd -P
+)) || exit 127
 [ "$canonical_real_directory" = "$shim_directory" ] && exit 127
 exec "$real_command" "$@"

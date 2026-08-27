@@ -6,6 +6,20 @@ export FZF_DEFAULT_OPTS='--preview '\''bat -n --color=always --line-range :500 {
 export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
 export FZF_CTRL_R_OPTS='--preview '\''echo {}'\'' --preview-window up:3:hidden:wrap --bind '\''ctrl-/:toggle-preview'\'' --bind '\''ctrl-y:execute-silent(echo -n {2..} | pbcopy)+abort'\'' --color header:italic --header '\''Press CTRL-Y to copy command into clipboard'\'''
 
+# Do not use `fzf --zsh`: that emits shell text for eval. A caller may opt in
+# to two inspected static files from a trusted local FZF installation instead.
+function mzsh_fzf_source_static_file() {
+  emulate -L zsh
+  [[ $# -eq 1 && -r $1 && -f $1 && ! -L $1 ]] || return 0
+  source "$1" || return 0
+}
+
+if [[ -n ${MZSH_FZF_SHELL_DIR:-} && -d $MZSH_FZF_SHELL_DIR && ! -L $MZSH_FZF_SHELL_DIR ]]; then
+  mzsh_fzf_source_static_file "$MZSH_FZF_SHELL_DIR/key-bindings.zsh"
+  mzsh_fzf_source_static_file "$MZSH_FZF_SHELL_DIR/completion.zsh"
+fi
+unset -f mzsh_fzf_source_static_file
+
 zstyle ':completion:*:git-checkout:*' sort false
 zstyle ':completion:*:descriptions' format '[%d]'
 zstyle ':fzf-tab:complete:(cd|z|ls|eza):*' fzf-preview 'eza -1 --color=always $realpath'

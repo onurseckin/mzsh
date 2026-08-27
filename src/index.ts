@@ -26,8 +26,20 @@ export function managedRepositoryRoot(moduleDirectory: string): string {
 }
 
 export function isManagedCliRoute(args: readonly string[]): boolean {
-  return ["audit", "bootstrap", "update", "rollback"].includes(args[0] ?? "") || args.some((arg) => ["--update", "--reinstall", "--uninst"].includes(arg));
+  return (
+    ['audit', 'bootstrap', 'update', 'rollback'].includes(args[0] ?? '') ||
+    args.some((arg) => ['--update', '--reinstall', '--uninst'].includes(arg))
+  );
 }
+
+export const checkoutLocalCommandLines = [
+  '  bun run mzsh -- audit [--source /absolute/checkout] [--json]',
+  '  bun run mzsh -- bootstrap --source /absolute/checkout [--apply]',
+  '  bun run mzsh -- update [--source /absolute/checkout] [--apply]',
+  '  bun run mzsh -- rollback receipt-id [--apply]',
+  '  bun run mzsh -- audit --json',
+  '  bun run mzsh -- bootstrap --source /absolute/mzsh-checkout',
+] as const;
 
 /**
  * ZshrcManager - Main command class for the mzsh CLI tool
@@ -49,10 +61,10 @@ export default class ZshrcManager extends Command {
 
   /** Example usage patterns displayed in help documentation */
   static override examples = [
-    'mzsh audit --json',
-    'mzsh bootstrap --source /absolute/mzsh-checkout',
-    'mzsh update --source /absolute/mzsh-checkout --apply',
-    'mzsh rollback receipt-id --apply',
+    'bun run mzsh -- audit --json',
+    'bun run mzsh -- bootstrap --source /absolute/mzsh-checkout',
+    'bun run mzsh -- update --source /absolute/mzsh-checkout --apply',
+    'bun run mzsh -- rollback receipt-id --apply',
   ];
 
   /**
@@ -85,9 +97,7 @@ export default class ZshrcManager extends Command {
    * The method follows this flow:
    * 1. Parse command-line arguments (mode-dependent)
    * 2. Validate flags and handle special cases (help, update)
-   * 3. Route to appropriate functionality:
-   *    - Update/reinstall operations → UpdateManager
-   *    - File management → FileDiscovery + InteractiveMenu
+   * 3. Route to a managed command or the file-discovery menu.
    * 4. Handle errors gracefully with user-friendly messages
    */
   override async run(): Promise<void> {
@@ -95,9 +105,9 @@ export default class ZshrcManager extends Command {
       const managedArgs = this.argv || process.argv.slice(2);
       if (isManagedCliRoute(managedArgs)) {
         process.exitCode = runMzshCli(managedArgs, {
-          home: process.env.HOME ?? "/",
-          xdgConfig: process.env.XDG_CONFIG_HOME ?? `${process.env.HOME ?? "/"}/.config`,
-          xdgCache: process.env.XDG_CACHE_HOME ?? `${process.env.HOME ?? "/"}/.cache`,
+          home: process.env.HOME ?? '/',
+          xdgConfig: process.env.XDG_CONFIG_HOME ?? `${process.env.HOME ?? '/'}/.config`,
+          xdgCache: process.env.XDG_CACHE_HOME ?? `${process.env.HOME ?? '/'}/.cache`,
           repositoryRoot: managedRepositoryRoot(__dirname),
           write: (message) => console.log(message),
         });
@@ -116,7 +126,6 @@ export default class ZshrcManager extends Command {
         // STANDALONE MODE: Manual argument parsing for maximum compatibility
         // This allows the tool to work even when OCLIF framework isn't fully loaded
         const args = this.argv || process.argv.slice(2);
-
 
         // Handle help requests manually in standalone mode
         if (args.includes('--help') || args.includes('-h')) {
@@ -194,10 +203,7 @@ export default class ZshrcManager extends Command {
     console.log(appMessages.help.description);
     console.log('');
     console.log('USAGE');
-    console.log('  mzsh audit [--source /absolute/checkout] [--json]');
-    console.log('  mzsh bootstrap --source /absolute/checkout [--apply]');
-    console.log('  mzsh update [--source /absolute/checkout] [--apply]');
-    console.log('  mzsh rollback receipt-id [--apply]');
+    for (const line of checkoutLocalCommandLines.slice(0, 4)) console.log(line);
     console.log('');
     console.log('OPTIONS');
     console.log(`  ${appMessages.help.options.openType}`);
@@ -205,7 +211,6 @@ export default class ZshrcManager extends Command {
     console.log(`  ${appMessages.help.options.help}`);
     console.log('');
     console.log('EXAMPLES');
-    console.log('  mzsh audit --json');
-    console.log('  mzsh bootstrap --source /absolute/mzsh-checkout');
+    for (const line of checkoutLocalCommandLines.slice(4)) console.log(line);
   }
 }

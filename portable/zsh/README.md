@@ -58,13 +58,18 @@ architecture-specific Homebrew default is assumed.
 | `ANDROID_HOME` / `ANDROID_SDK_ROOT` | Android SDK root; `ANDROID_HOME` wins when both are set.                           |
 | `MZSH_OH_MY_ZSH_ROOT`               | Optional Oh My Zsh root; defaults to `$HOME/.oh-my-zsh`.                           |
 | `MZSH_DOCKER_COMPLETION_DIR`        | Existing Docker completion directory to register before completion initialization. |
+| `MZSH_FZF_SHELL_DIR`                | Trusted local directory containing static FZF key bindings and completion files.   |
 | `MZSH_PRIVATE_ZSH`                  | Optional local private-file override.                                              |
 | `MZSH_OBSERVE=1`                    | Enables redacted diagnostics on stderr.                                            |
 
 NVM has the auditable policy `MZSH_NVM_POLICY=existing-installation-only`.
 Startup sources `nvm.sh` only when that file already exists. It never installs
 Node, selects a hard-coded Node release, or contacts the network, so an
-existing project `.nvmrc` remains available to NVM's normal behavior.
+existing project `.nvmrc` remains available to NVM's normal behavior. When the
+existing loader provides `NVM_BIN`, that already-selected runtime is placed
+after safety shims and before Homebrew application paths. This lets an
+operator-managed NVM/LTS policy win interactive Node resolution while
+Homebrew's Node remains a dependency/fallback path.
 
 ## Completion ownership
 
@@ -79,6 +84,14 @@ MZSH restores its own state after any module failure but cannot claim to roll
 back arbitrary third-party framework state created while that framework was
 sourced. The optional framework loader runs only in an interactive shell; a
 missing framework, theme, or plugin remains a no-op.
+
+## Optional FZF integration
+
+`search.zsh` is interactive-only and does not run `fzf --zsh` or evaluate
+generated shell text. To opt in, set `MZSH_FZF_SHELL_DIR` to a trusted local,
+non-symlink directory containing regular readable `key-bindings.zsh` and
+`completion.zsh` files. MZSH sources only those static files and does not
+install FZF, search package-manager paths, or contact the network at startup.
 
 ## Local private boundary
 

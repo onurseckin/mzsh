@@ -13,9 +13,9 @@ export const appMessages = {
       code: 'APP_001',
     },
     noConfigFiles: {
-      message: 'No zsh configuration files found',
+      message: 'No managed or legacy zsh configuration files found',
       action:
-        'Create a zsh configuration file:\n  • touch ~/.zshrc (for zsh)\n  • touch ~/.bashrc (for bash)\n  • Or check if your shell configuration files exist in expected locations',
+        'Start with a read-only audit:\n  • bun run mzsh -- audit\n  • bun run mzsh -- bootstrap --source /absolute/mzsh-checkout\n  • Re-run the menu after the dry-run plan is reviewed',
       code: 'APP_002',
     },
     fileDiscoveryFailed: {
@@ -46,22 +46,23 @@ export const appMessages = {
 
   // Help content
   help: {
-    description: 'Interactive zsh configuration file manager',
-    usage: 'mzsh [OPTIONS]',
+    description: 'Managed Zsh configuration migration and inspection tool',
+    usage: 'bun run mzsh -- [audit|bootstrap|update|rollback] [OPTIONS]',
     options: {
-      openType: '-o, --open-type <type>  How to open the selected file',
-      update: '--update            Update mzsh to the latest version',
-      reinstall: '--reinstall         Reinstall mzsh (same as --update)',
-      uninst: '--uninst            Uninstall mzsh from the system',
+      openType: '-o, --open-type <type>  Open a managed or legacy migration-context file',
+      update:
+        'bun run mzsh -- update [--source <path>] [--apply]  Plan or apply a local managed update',
+      bootstrap:
+        'bun run mzsh -- bootstrap --source <path> [--apply]  Plan or apply initial adoption',
+      rollback:
+        'bun run mzsh -- rollback <receipt-id> [--apply]  Restore one recorded adoption transaction',
       help: '-h, --help              Show help',
     },
     examples: [
-      'mzsh                    # Use default application',
-      'mzsh -o vim            # Open with vim',
-      'mzsh --open-type code  # Open with VS Code',
-      'mzsh --update          # Update mzsh',
-      'mzsh --reinstall       # Reinstall mzsh',
-      'mzsh --uninst          # Uninstall mzsh',
+      'bun run mzsh -- audit',
+      'bun run mzsh -- bootstrap --source /absolute/mzsh-checkout',
+      'bun run mzsh -- update --source /absolute/mzsh-checkout',
+      'bun run mzsh -- rollback receipt-id',
     ],
   },
 } as const;
