@@ -34,6 +34,28 @@ reality until a reviewed global release path exists. The decisions below define
 the future product boundary; they do not retroactively claim that unreleased
 commands, artifacts, or services exist.
 
+## Approved runtime and terminal foundation
+
+- Bun and TypeScript are the approved system-of-record runtime and language for
+  MZSH. The workload is primarily filesystem, process, network-bound update,
+  and inventory work; retaining the audited TypeScript core avoids an otherwise
+  unnecessary rewrite while preserving the existing Bun build and test flow.
+- Bun's built-in API surface includes `bun:sqlite`, which supports the accepted
+  local action-history boundary without introducing a separate runtime or
+  database driver. See the [Bun API reference](https://bun.sh/docs/runtime/bun-apis).
+- Bun has no selected LTS channel for this product. MZSH therefore uses exact,
+  stable-GA Bun pins and compatibility gates rather than a floating runtime
+  version or an implied LTS promise. Each pin change must verify the supported
+  host target matrix before it becomes a release baseline.
+- Compiled distribution artifacts are a later delivery concern. They may make
+  global installation simpler, but they do not replace Bun and TypeScript as
+  the system of record or create a second implementation path.
+- OpenTUI is the approved full-screen terminal foundation. It is isolated behind
+  a renderer adapter, exact dependency pin, and explicit supported-target
+  matrix. The [OpenTUI project](https://github.com/anomalyco/opentui) publishes
+  its core, React, and Solid packages, which keeps the adapter decision
+  separate from the terminal foundation decision.
+
 ## Accepted product decisions
 
 ### Setup, update, and distribution
@@ -150,10 +172,10 @@ commands, artifacts, or services exist.
 These decisions are intentionally unresolved. They must be selected through a
 reviewed architecture decision before implementation depends on them.
 
-1. Runtime, language, terminal-interface, and command-line stack: choose
-   libraries and process boundaries that can implement the shared schema,
-   fullscreen interaction, and existing Bun workflow without duplicating the
-   current parser/router.
+1. UI renderer adapter and command framework: verify whether `@opentui/react`,
+   Solid, or the core API best fits the renderer adapter, and choose the command
+   framework without duplicating the shared parser/router. Commander and Citty
+   are not approved by this checkpoint.
 2. Global release artifact: define the exact GitHub-distributed artifact,
    provenance verification, install location, version discovery, clean
    fast-forward update rules, and recovery when the local installation changes.
@@ -206,7 +228,8 @@ the following:
 
 This checkpoint contains no credential material, personal paths, placeholder
 tasks, or unapproved installation syntax. The future lifecycle name is an
-accepted product decision; the global artifact and CLI stack remain explicitly
-unresolved. It uses no fenced commands. Its only link is relative and points
-to an existing architecture document. The document is a durable decision record
-and remains below the repository line limit.
+accepted product decision; the global artifact, UI renderer adapter, and command
+framework remain explicitly unresolved. It uses no fenced commands. Its links
+are relative architecture navigation or primary upstream project references.
+The document is a durable decision record and remains below the repository line
+limit.
