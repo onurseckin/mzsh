@@ -22,6 +22,11 @@ const extraction = Object.freeze([
     ruleId: 'aws-secret-context',
   },
   {
+    prefix: 'AWS_',
+    sourcePath: 'src/services/redaction/rules/cloud-providers.ts',
+    ruleId: 'aws-session-token-context',
+  },
+  {
     prefix: 'AZURE_',
     sourcePath: 'src/services/redaction/rules/cloud-providers.ts',
     ruleId: 'azure-ad-client-secret-context',
@@ -35,6 +40,11 @@ const extraction = Object.freeze([
     prefix: 'CLOUDFLARE_',
     sourcePath: 'src/services/redaction/rules/cloud-providers.ts',
     ruleId: 'cloudflare-api-token',
+  },
+  {
+    prefix: 'CLOUDFLARE_',
+    sourcePath: 'src/services/redaction/rules/cloud-providers.ts',
+    ruleId: 'cloudflare-global-api-key',
   },
   {
     prefix: 'CLIENT_',
@@ -102,7 +112,7 @@ const extraction = Object.freeze([
     ruleId: 'env-var-secret-suffix',
   },
 ]);
-const prefixes = Object.freeze(extraction.map((entry) => entry.prefix));
+const prefixes = Object.freeze([...new Set(extraction.map((entry) => entry.prefix))]);
 
 export const gatewayRedactionRegistry: RedactionRegistry = Object.freeze({
   prefixes,
@@ -114,10 +124,12 @@ export const gatewayRedactionRegistry: RedactionRegistry = Object.freeze({
       'keyword-anchored-secret',
       'extended-keyword-anchored-secret',
       'env-var-secret-suffix',
+      'long-base64-after-keyword',
       'aws-secret-context',
       'aws-session-token-context',
       'azure-ad-client-secret-context',
       'cloudflare-api-token',
+      'cloudflare-global-api-key',
     ]),
     extraction,
   }),
