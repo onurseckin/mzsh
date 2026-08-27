@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { chmodSync, cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { PORTABLE_INTERACTIVE_MODULE_ORDER, PORTABLE_LOGIN_MODULE_ORDER } from "../src/domain/portable-module-order";
 
 const repositoryRoot = resolve(import.meta.dir, "..");
 const entrypoint = join(repositoryRoot, "portable", "zsh", "init.zsh");
@@ -13,6 +14,18 @@ if (discoveredZshPath === null) {
 }
 
 const zshPath = discoveredZshPath;
+
+function portableEnvironment(): Record<string, string | undefined> {
+  return {
+    ...process.env,
+    PNPM_HOME: "",
+    MZSH_PNPM_GLOBAL_BIN: "",
+    RUBY_HOME: "",
+    PYTHONUSERBASE: "",
+    GOPATH: "",
+    JAVA_HOME: "",
+  };
+}
 
 function createFixture(): string {
   mkdirSync(fixtureParent, { recursive: true });
@@ -33,7 +46,7 @@ function copyPortableRoot(fixture: string): string {
   return portableRoot;
 }
 
-function injectBoundaryFailure(portableRoot: string, boundary: "path" | "oh-my-zsh" | "completion"): string {
+function injectBoundaryFailure(portableRoot: string, boundary: "path" | "oh-my-zsh" | "completion" | "private"): string {
   const modulePath = join(portableRoot, "modules", `${boundary}.zsh`);
   const module = readFileSync(modulePath, "utf8");
   const finalReturn = "\nreturn 0\n";
@@ -68,7 +81,7 @@ function runEntrypoint(fixture: string, privateFile?: string): ReturnType<typeof
   return Bun.spawnSync([zshPath, "-fc", script], {
     cwd: fixture,
     env: {
-      ...process.env,
+      ...portableEnvironment(),
       HOME: join(fixture, "home"),
       PATH: [join(fixture, "system"), join(fixture, "system"), "/usr/bin", "/bin"].join(":"),
       XDG_CACHE_HOME: join(fixture, "cache"),
@@ -79,6 +92,12 @@ function runEntrypoint(fixture: string, privateFile?: string): ReturnType<typeof
       NVM_DIR: join(fixture, "nvm"),
       CARGO_HOME: join(fixture, "cargo"),
       ANDROID_HOME: join(fixture, "android"),
+      PNPM_HOME: "",
+      MZSH_PNPM_GLOBAL_BIN: "",
+      RUBY_HOME: "",
+      PYTHONUSERBASE: "",
+      GOPATH: "",
+      JAVA_HOME: "",
       MZSH_OH_MY_ZSH_ROOT: "",
       MZSH_DOCKER_COMPLETION_DIR: "",
       MZSH_PRIVATE_ZSH: privateFile === undefined ? join(fixture, "missing-private.zsh") : privateFile,
@@ -135,10 +154,10 @@ describe("portable Zsh foundation", () => {
       'print -r -- "MODULES=${MZSH_LOADED_MODULES:-absent}"',
     ].join("\n");
 
-    const result = Bun.spawnSync([zshPath, "-fc", script], {
+    const result = Bun.spawnSync([zshPath, "-fic", script], {
       cwd: fixture,
       env: {
-        ...process.env,
+        ...portableEnvironment(),
         HOME: join(fixture, "home"),
         PATH: `${join(fixture, "system")}:/usr/bin:/bin`,
         FPATH: "",
@@ -191,10 +210,11 @@ describe("portable Zsh foundation", () => {
         'print -r -- "SECOND=$second_status"',
         'print -r -- "RETRY_TRACE=${(j:,:)MZSH_LOADED_MODULES}"',
       ].join("\n");
-      const result = Bun.spawnSync([zshPath, "-fc", script], {
+      const shellFlags = failureBoundary === "oh-my-zsh" ? "-fic" : "-fc";
+      const result = Bun.spawnSync([zshPath, shellFlags, script], {
         cwd: fixture,
         env: {
-          ...process.env,
+          ...portableEnvironment(),
           HOME: join(fixture, "home"),
           PATH: `${join(fixture, "system")}:/usr/bin:/bin`,
           FPATH: "",
@@ -225,8 +245,119 @@ describe("portable Zsh foundation", () => {
       expect(output).toContain("PATH_HELPER_AFTER_FAILURE=0\n");
       expect(output).toContain("OBSERVE_HELPER_AFTER_FAILURE=0\n");
       expect(output).toContain("SECOND=0\n");
-      expect(output).toContain("RETRY_TRACE=observability,path,homebrew,bun,nvm,rust,android,private,completion-directories,oh-my-zsh,completion\n");
+      expect(output).toContain(`RETRY_TRACE=${PORTABLE_INTERACTIVE_MODULE_ORDER.join(",")}\n`);
     }
+  });
+
+  test("restores prior interactive definitions after a post-framework private failure and permits a corrected retry", () => {
+    const fixture = createFixture();
+    const portableRoot = copyPortableRoot(fixture);
+    const failureVariable = injectBoundaryFailure(portableRoot, "private");
+    makeDirectory(fixture, "home");
+    makeDirectory(fixture, "system");
+    const frameworkRoot = makeDirectory(fixture, "oh-my-zsh");
+    writeFileSync(join(frameworkRoot, "oh-my-zsh.sh"), "return 0\n");
+    const scalarReplaySentinel = join(fixture, "scalar-replay-sentinel");
+    const arrayReplaySentinel = join(fixture, "array-replay-sentinel");
+    const policyReplaySentinel = join(fixture, "policy-replay-sentinel");
+    const hostileScalar = `$(touch ${scalarReplaySentinel}) ; original-history-search`;
+    const hostileArrayValue = `$(touch ${arrayReplaySentinel})`;
+    const hostilePolicy = `original-policy; $(touch ${policyReplaySentinel})`;
+
+    const script = [
+      "function compinit() { return 0 }",
+      "function n() { print -r -- original-n }",
+      "function dburl() { print -r -- original-dburl }",
+      "function user_precmd() { return 0 }",
+      "alias rm=original-rm",
+      `precmd_functions=(user_precmd '${hostileArrayValue}')`,
+      `plugins=(original-plugin '${hostileArrayValue}')`,
+      "export ZSH=original-zsh ZSH_THEME=original-theme ZSH_TMUX_CONFIG=original-tmux",
+      "export FZF_DEFAULT_COMMAND=original-fzf",
+      "unset FZF_DEFAULT_OPTS",
+      `export FZF_CTRL_R_OPTS='${hostileScalar}'`,
+      `MZSH_NVM_POLICY='${hostilePolicy}'`,
+      "zstyle ':completion:*:descriptions' format 'existing description' 'second description'",
+      "zstyle ':fzf-tab:*' switch-group '[' ']'",
+      "zstyle ':omz:plugins:ssh-agent' identities original_rsa original_ed25519",
+      "zstyle ':omz:plugins:ssh-agent' lifetime original-lifetime",
+      "unsetopt append_history share_history hist_save_no_dups",
+      "setopt inc_append_history hist_ignore_dups hist_ignore_space",
+      `export ${failureVariable}=1`,
+      'source "$MZSH_ENTRYPOINT"; first_status=$?',
+      'print -r -- "FIRST=$first_status"',
+      'print -r -- "RESTORED=${aliases[rm]}:${+functions[n]}:${+functions[dburl]}:$ZSH:$ZSH_THEME:$ZSH_TMUX_CONFIG:$FZF_DEFAULT_COMMAND"',
+      'print -r -- "ARRAYS_RESTORED=${(j:,:)precmd_functions}:${(j:,:)plugins}"',
+      'print -r -- "FZF_HISTORY_RESTORED=$FZF_CTRL_R_OPTS"',
+      'print -r -- "SCALAR_TYPES=${parameters[FZF_CTRL_R_OPTS]}:${parameters[MZSH_NVM_POLICY]}"',
+      'print -r -- "ABSENT_SCALARS=${+parameters[MZSH_COMPLETION_OWNER]}:${+parameters[FZF_DEFAULT_OPTS]}"',
+      'print -r -- "ABSENT_ARRAYS=${+parameters[MZSH_LOADED_MODULES]}:${+parameters[MZSH_PATH_SHIMS]}:${+parameters[MZSH_PATH_APPLICATIONS]}"',
+      'print -r -- "SIDE_EFFECTS=$([[ -e $MZSH_TEST_SCALAR_SENTINEL ]] && print present || print absent):$([[ -e $MZSH_TEST_ARRAY_SENTINEL ]] && print present || print absent):$([[ -e $MZSH_TEST_POLICY_SENTINEL ]] && print present || print absent)"',
+      'function print_style() { local label=$1 context=$2 name=$3; local -a values; if zstyle -L "$context" "$name" >/dev/null 2>&1; then zstyle -a "$context" "$name" values; print -r -- "STYLE_${label}=present:${(j:,:)values}"; else print -r -- "STYLE_${label}=absent"; fi }',
+      "print_style omz-identities ':omz:plugins:ssh-agent' identities",
+      "print_style omz-lifetime ':omz:plugins:ssh-agent' lifetime",
+      "print_style omz-lazy ':omz:plugins:ssh-agent' lazy",
+      "print_style git-sort ':completion:*:git-checkout:*' sort",
+      "print_style descriptions-format ':completion:*:descriptions' format",
+      "print_style directories-preview ':fzf-tab:complete:(cd|z|ls|eza):*' fzf-preview",
+      "print_style parameters-preview ':fzf-tab:complete:(-command-|-parameter-|-brace-parameter-|export|unset|expand):*' fzf-preview",
+      "print_style command-preview ':fzf-tab:complete:-command-:*' fzf-preview",
+      "print_style fallback-preview ':fzf-tab:complete:*:*' fzf-preview",
+      "print_style switch-group ':fzf-tab:*' switch-group",
+      "print_style fzf-flags ':fzf-tab:*' fzf-flags",
+      'print -r -- "OPTIONS_RESTORED=${options[appendhistory]},${options[incappendhistory]},${options[sharehistory]},${options[histignoredups]},${options[histsavenodups]},${options[histignorespace]}"',
+      "n; dburl",
+      `unset ${failureVariable}`,
+      'source "$MZSH_ENTRYPOINT"; second_status=$?',
+      'print -r -- "SECOND=$second_status"',
+      'print -r -- "RETRY_OPTIONS=${options[appendhistory]},${options[incappendhistory]},${options[sharehistory]},${options[histignoredups]},${options[histsavenodups]},${options[histignorespace]}"',
+    ].join("\n");
+    const result = Bun.spawnSync([zshPath, "-fic", script], {
+      cwd: fixture,
+      env: {
+        ...portableEnvironment(),
+        HOME: join(fixture, "home"),
+        PATH: `${join(fixture, "system")}:/usr/bin:/bin`,
+        FPATH: "",
+        MZSH_ENTRYPOINT: join(portableRoot, "init.zsh"),
+        MZSH_OH_MY_ZSH_ROOT: frameworkRoot,
+        MZSH_PRIVATE_ZSH: join(fixture, "missing-private.zsh"),
+        MZSH_TEST_SCALAR_SENTINEL: scalarReplaySentinel,
+        MZSH_TEST_ARRAY_SENTINEL: arrayReplaySentinel,
+        MZSH_TEST_POLICY_SENTINEL: policyReplaySentinel,
+      },
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(errorOutputOf(result)).toBe("");
+    expect(outputOf(result)).toContain("FIRST=1\n");
+    expect(outputOf(result)).toContain("RESTORED=original-rm:1:1:original-zsh:original-theme:original-tmux:original-fzf\n");
+    expect(outputOf(result)).toContain(`ARRAYS_RESTORED=user_precmd,${hostileArrayValue}:original-plugin,${hostileArrayValue}\n`);
+    expect(outputOf(result)).toContain(`FZF_HISTORY_RESTORED=${hostileScalar}\n`);
+    expect(outputOf(result)).toContain("SCALAR_TYPES=scalar-export:scalar\n");
+    expect(outputOf(result)).toContain("ABSENT_SCALARS=0:0\n");
+    expect(outputOf(result)).toContain("ABSENT_ARRAYS=0:0:0\n");
+    expect(outputOf(result)).toContain("SIDE_EFFECTS=absent:absent:absent\n");
+    expect(outputOf(result)).toContain("STYLE_omz-identities=present:original_rsa,original_ed25519\n");
+    expect(outputOf(result)).toContain("STYLE_omz-lifetime=present:original-lifetime\n");
+    expect(outputOf(result)).toContain("STYLE_omz-lazy=absent\n");
+    expect(outputOf(result)).toContain("STYLE_git-sort=absent\n");
+    expect(outputOf(result)).toContain("STYLE_descriptions-format=present:existing description,second description\n");
+    expect(outputOf(result)).toContain("STYLE_directories-preview=absent\n");
+    expect(outputOf(result)).toContain("STYLE_parameters-preview=absent\n");
+    expect(outputOf(result)).toContain("STYLE_command-preview=absent\n");
+    expect(outputOf(result)).toContain("STYLE_fallback-preview=absent\n");
+    expect(outputOf(result)).toContain("STYLE_switch-group=present:[,]\n");
+    expect(outputOf(result)).toContain("STYLE_fzf-flags=absent\n");
+    expect(outputOf(result)).toContain("OPTIONS_RESTORED=off,on,off,on,off,on\n");
+    expect(outputOf(result)).toContain("original-n\noriginal-dburl\n");
+    expect(outputOf(result)).toContain("SECOND=0\n");
+    expect(outputOf(result)).toContain("RETRY_OPTIONS=on,on,on,on,on,on\n");
+    const initSource = readFileSync(join(portableRoot, "init.zsh"), "utf8");
+    expect(initSource).not.toContain("eval ");
+    expect(initSource).not.toContain("typeset -p");
   });
 
   test("publishes a stable successful module trace and redacted diagnostics", () => {
@@ -247,7 +378,7 @@ describe("portable Zsh foundation", () => {
     const result = Bun.spawnSync([zshPath, "-fc", script], {
       cwd: fixture,
       env: {
-        ...process.env,
+        ...portableEnvironment(),
         HOME: join(fixture, "home"),
         PATH: `${join(fixture, "system")}:/usr/bin:/bin`,
         MZSH_ENTRYPOINT: entrypoint,
@@ -265,12 +396,14 @@ describe("portable Zsh foundation", () => {
       stderr: "pipe",
     });
 
-    const expectedTrace = "observability,path,homebrew,bun,nvm,rust,android,private,completion-directories,oh-my-zsh,completion";
+    const expectedTrace = PORTABLE_INTERACTIVE_MODULE_ORDER.join(",");
     expect(result.exitCode).toBe(0);
     expect(outputOf(result)).toContain("VERSION=1\n");
     expect(outputOf(result)).toContain(`TRACE=${expectedTrace}\n`);
     expect(outputOf(result)).toContain(`TRACE_AFTER_RESOURCE=${expectedTrace}\n`);
-    expect(errorOutputOf(result).match(/^mzsh: module-loaded:[a-z-]+$/gm)).toHaveLength(11);
+    expect(errorOutputOf(result).match(/^mzsh: module-loaded:[a-z-]+$/gm)).toHaveLength(
+      PORTABLE_INTERACTIVE_MODULE_ORDER.length
+    );
   });
 
   test("builds a deduplicated PATH in explicit application and shim precedence", () => {
@@ -323,7 +456,7 @@ describe("portable Zsh foundation", () => {
     const result = Bun.spawnSync([zshPath, "-fc", script], {
       cwd: fixture,
       env: {
-        ...process.env,
+        ...portableEnvironment(),
         HOME: join(fixture, "home"),
         PATH: `${join(fixture, "system")}:${join(fixture, "system")}/:/usr/bin:/bin`,
         MZSH_ENTRYPOINT: entrypoint,
@@ -379,7 +512,7 @@ describe("portable Zsh foundation", () => {
     const result = Bun.spawnSync([zshPath, "-fc", script], {
       cwd: fixture,
       env: {
-        ...process.env,
+        ...portableEnvironment(),
         HOME: join(fixture, "home"),
         PATH: `${join(fixture, "system")}:/usr/bin:/bin`,
         FPATH: "",
@@ -419,7 +552,7 @@ describe("portable Zsh foundation", () => {
     const result = Bun.spawnSync([zshPath, "-fc", script], {
       cwd: fixture,
       env: {
-        ...process.env,
+        ...portableEnvironment(),
         HOME: join(fixture, "home"),
         PATH: `${join(fixture, "system")}:/usr/bin:/bin`,
         XDG_CACHE_HOME: join(fixture, "cache"),
@@ -469,10 +602,10 @@ describe("portable Zsh foundation", () => {
       'print -r -- "FRAMEWORK_COMPINIT_CALLS=$MZSH_FRAMEWORK_COMPINIT_CALLS"',
       'print -r -- "FRAMEWORK_FPATH_AT_COMPINIT=$MZSH_FRAMEWORK_FPATH_AT_COMPINIT"',
     ].join("\n");
-    const result = Bun.spawnSync([zshPath, "-fc", script], {
+    const result = Bun.spawnSync([zshPath, "-fic", script], {
       cwd: fixture,
       env: {
-        ...process.env,
+        ...portableEnvironment(),
         HOME: join(fixture, "home"),
         PATH: `${join(fixture, "system")}:/usr/bin:/bin`,
         FPATH: "",
@@ -574,7 +707,7 @@ describe("portable Zsh foundation", () => {
     const result = Bun.spawnSync([zshPath, "-fc", script], {
       cwd: fixture,
       env: {
-        ...process.env,
+        ...portableEnvironment(),
         HOME: join(fixture, "home"),
         PATH: `${fakeBin}:${join(fixture, "system")}:/usr/bin:/bin`,
         FPATH: "",
@@ -609,7 +742,7 @@ describe("portable Zsh foundation", () => {
     const result = Bun.spawnSync([zshPath, "-fc", script], {
       cwd: fixture,
       env: {
-        ...process.env,
+        ...portableEnvironment(),
         HOME: join(fixture, "home"),
         PATH: `${join(fixture, "system")}:/usr/bin:/bin`,
         MZSH_ENTRYPOINT: entrypoint,
@@ -634,10 +767,10 @@ describe("portable Zsh foundation", () => {
     makeDirectory(fixture, "home");
     makeDirectory(fixture, "system");
 
-    for (const [loaderName, expectedContext] of [
-      ["zshenv.zsh", "all-shell"],
-      ["zprofile.zsh", "login"],
-      ["zshrc.zsh", "interactive"],
+    for (const [loaderName, expectedContext, shellFlags] of [
+      ["zshenv.zsh", "all-shell", "-dfc"],
+      ["zprofile.zsh", "login", "-dflc"],
+      ["zshrc.zsh", "interactive", "-dfic"],
     ]) {
       const loader = join(repositoryRoot, "portable", "zsh", "loaders", loaderName);
       const script = [
@@ -645,10 +778,10 @@ describe("portable Zsh foundation", () => {
         'print -r -- "SOURCE_STATUS=$source_status"',
         'print -r -- "CONTEXT=${MZSH_PORTABLE_ZSH_LOADER_CONTEXT:-absent}"',
       ].join("\n");
-      const result = Bun.spawnSync([zshPath, "-dfc", script], {
+      const result = Bun.spawnSync([zshPath, shellFlags, script], {
         cwd: fixture,
         env: {
-          ...process.env,
+          ...portableEnvironment(),
           HOME: join(fixture, "home"),
           PATH: `${join(fixture, "system")}:/usr/bin:/bin`,
           MZSH_LOADER: loader,
@@ -664,6 +797,78 @@ describe("portable Zsh foundation", () => {
     }
   });
 
+  test("keeps TypeScript and Zsh module orders identical", () => {
+    const manifest = readFileSync(join(repositoryRoot, "portable", "zsh", "manifest.zsh"), "utf8");
+    const loginManifest = readFileSync(join(repositoryRoot, "portable", "zsh", "login-manifest.zsh"), "utf8");
+    const modulesIn = (source: string, arrayName: string): string[] => {
+      const match = source.match(new RegExp(`${arrayName}=\\(\\n([\\s\\S]*?)\\n\\)`));
+      return match?.[1]?.trim().split(/\s+/) ?? [];
+    };
+    const interactiveModules = [
+      ...modulesIn(manifest, "mzsh_pre_framework_modules"),
+      ...modulesIn(manifest, "mzsh_framework_modules"),
+    ];
+    const loginModules = modulesIn(loginManifest, "mzsh_login_modules");
+
+    expect(interactiveModules).toEqual([...PORTABLE_INTERACTIVE_MODULE_ORDER]);
+    expect(loginModules).toEqual([...PORTABLE_LOGIN_MODULE_ORDER]);
+  });
+
+  test("loads login paths before interactive behavior and remains idempotent", () => {
+    const fixture = createFixture();
+    for (const directory of ["home", "system", "shims", "homebrew/bin", "homebrew/sbin", "bun/bin", "cargo/bin"]) {
+      makeDirectory(fixture, directory);
+    }
+
+    const script = [
+      "function compinit() { return 0 }",
+      'source "$MZSH_ZPROFILE" || exit 1',
+      'print -r -- "LOGIN=${(j:,:)MZSH_LOGIN_LOADED_MODULES}"',
+      'source "$MZSH_ZSHRC" || exit 1',
+      'source "$MZSH_ZSHRC" || exit 1',
+      'print -r -- "INTERACTIVE=${(j:,:)MZSH_LOADED_MODULES}"',
+      'print -r -- "PATH=$PATH"',
+    ].join("\n");
+    const result = Bun.spawnSync([zshPath, "-dfl", "-i", "-c", script], {
+      cwd: fixture,
+      env: {
+        ...portableEnvironment(),
+        HOME: join(fixture, "home"),
+        PATH: `${join(fixture, "system")}:${join(fixture, "system")}:/usr/bin:/bin`,
+        MZSH_ZPROFILE: join(repositoryRoot, "portable", "zsh", "loaders", "zprofile.zsh"),
+        MZSH_ZSHRC: join(repositoryRoot, "portable", "zsh", "loaders", "zshrc.zsh"),
+        MZSH_COMMAND_SHIM_DIR: join(fixture, "shims"),
+        MZSH_HOMEBREW_PREFIX: join(fixture, "homebrew"),
+        MZSH_MACPORTS_PREFIX: "",
+        BUN_INSTALL: join(fixture, "bun"),
+        NVM_DIR: "",
+        CARGO_HOME: join(fixture, "cargo"),
+        ANDROID_HOME: "",
+        ANDROID_SDK_ROOT: "",
+        PNPM_HOME: "",
+        MZSH_PNPM_GLOBAL_BIN: "",
+        RUBY_HOME: "",
+        PYTHONUSERBASE: "",
+        GOPATH: "",
+        JAVA_HOME: "",
+        MZSH_OH_MY_ZSH_ROOT: "",
+        MZSH_PRIVATE_ZSH: join(fixture, "missing-private.zsh"),
+      },
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(errorOutputOf(result)).toBe("");
+    expect(outputOf(result)).toContain(`LOGIN=${PORTABLE_LOGIN_MODULE_ORDER.join(",")}\n`);
+    expect(outputOf(result)).toContain(`INTERACTIVE=${PORTABLE_INTERACTIVE_MODULE_ORDER.join(",")}\n`);
+    const pathLine = outputOf(result)
+      .split("\n")
+      .find((line) => line.startsWith("PATH="));
+    expect(pathLine?.replace(/^PATH=/, "").split(":").filter((entry) => entry === join(fixture, "shims"))).toHaveLength(1);
+    expect(pathLine?.startsWith(`PATH=${join(fixture, "shims")}:`)).toBe(true);
+  });
+
   test("emits observability only when explicitly enabled", () => {
     const fixture = createFixture();
     makeDirectory(fixture, "home");
@@ -676,7 +881,7 @@ describe("portable Zsh foundation", () => {
     const result = Bun.spawnSync([zshPath, "-fc", script], {
       cwd: fixture,
       env: {
-        ...process.env,
+        ...portableEnvironment(),
         HOME: join(fixture, "home"),
         PATH: `${join(fixture, "system")}:/usr/bin:/bin`,
         MZSH_ENTRYPOINT: entrypoint,
@@ -703,6 +908,7 @@ describe("portable Zsh foundation", () => {
     const portableFiles = [
       "init.zsh",
       "manifest.zsh",
+      "login-manifest.zsh",
       "modules/path.zsh",
       "modules/homebrew.zsh",
       "modules/bun.zsh",
@@ -714,6 +920,15 @@ describe("portable Zsh foundation", () => {
       "modules/completion.zsh",
       "modules/private.zsh",
       "modules/observability.zsh",
+      "modules/safety-shims.zsh",
+      "modules/macports.zsh",
+      "modules/runtime-paths.zsh",
+      "modules/prompt-vi.zsh",
+      "modules/aliases.zsh",
+      "modules/search.zsh",
+      "modules/history.zsh",
+      "modules/dburl.zsh",
+      "modules/ports-manager.zsh",
       "loaders/zshenv.zsh",
       "loaders/zprofile.zsh",
       "loaders/zshrc.zsh",

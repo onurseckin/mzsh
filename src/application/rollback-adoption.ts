@@ -1,5 +1,6 @@
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import type { AdoptionReceipt, AdoptionReceiptTarget, AdoptionRollbackResult, AdoptionTargetKind, AdoptionTargetState } from "../domain/adoption";
+import { PORTABLE_INTERACTIVE_MODULE_ORDER } from "../domain/portable-module-order";
 import { NodeAdoptionFilesystem } from "../infrastructure/adoption-filesystem";
 
 export interface RollbackAdoptionInput {
@@ -13,7 +14,6 @@ export interface RollbackAdoptionDependencies {
 
 const targetKinds: readonly AdoptionTargetKind[] = ["absent", "file", "symlink", "directory", "other"];
 const categories = ["loader", "private", "legacy", "shims", "current"] as const;
-const portableModuleOrder = ["observability", "path", "homebrew", "bun", "nvm", "rust", "android", "private", "completion-directories", "oh-my-zsh", "completion"];
 
 function sameState(left: AdoptionTargetState, right: AdoptionTargetState): boolean {
   return left.kind === right.kind && left.mode === right.mode && left.ownerId === right.ownerId && left.hash === right.hash && left.linkTarget === right.linkTarget;
@@ -89,7 +89,11 @@ function validateReceipt(receipt: AdoptionReceipt, receiptPath: string, filesyst
     "shims",
     "current",
   ];
-  if (receipt.moduleOrder.join(",") !== portableModuleOrder.join(",") || receipt.pathOrder.join(",") !== expectedPathOrder.join(",")) return false;
+  if (
+    receipt.moduleOrder.join(",") !== PORTABLE_INTERACTIVE_MODULE_ORDER.join(",") ||
+    receipt.pathOrder.join(",") !== expectedPathOrder.join(",")
+  )
+    return false;
   const required = new Set(["private", "shims", "current"]);
   const loaderPaths = new Set([join(receipt.home, ".zshenv"), join(receipt.home, ".zprofile"), join(receipt.home, ".zshrc")]);
   for (const target of receipt.targets) {

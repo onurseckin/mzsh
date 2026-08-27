@@ -1,20 +1,7 @@
 import { join } from "node:path";
 import type { AdoptionPlan, AdoptionPlanResult, AdoptionTarget, AdoptionTargetState } from "../domain/adoption";
+import { PORTABLE_INTERACTIVE_MODULE_ORDER } from "../domain/portable-module-order";
 import { NodeAdoptionFilesystem } from "../infrastructure/adoption-filesystem";
-
-const moduleOrder = [
-  "observability",
-  "path",
-  "homebrew",
-  "bun",
-  "nvm",
-  "rust",
-  "android",
-  "private",
-  "completion-directories",
-  "oh-my-zsh",
-  "completion",
-];
 
 export interface PlanAdoptionInput {
   home: string;
@@ -179,7 +166,7 @@ function planAdoptionUnchecked(input: PlanAdoptionInput, dependencies: PlanAdopt
     shimLink: join(managedRoot, "shims"),
     entrypoint,
     repositoryPreconditions: { entrypointHash, packageHash },
-    moduleOrder,
+    moduleOrder: PORTABLE_INTERACTIVE_MODULE_ORDER,
     targets: targetObjects,
     mutations: [
       { category: categories[0], path: targets[0]!, kind: "file" },

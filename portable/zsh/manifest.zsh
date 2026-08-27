@@ -5,17 +5,26 @@ typeset -a mzsh_loaded_modules=()
 typeset -a mzsh_pre_framework_modules=(
   observability
   path
+  safety-shims
+  macports
   homebrew
   bun
   nvm
   rust
   android
-  private
+  runtime-paths
   completion-directories
 )
 typeset -a mzsh_framework_modules=(
   oh-my-zsh
   completion
+  prompt-vi
+  aliases
+  search
+  history
+  dburl
+  ports-manager
+  private
 )
 
 for mzsh_portable_zsh_module in "${mzsh_pre_framework_modules[@]}"; do

@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+command_name="${1##*/}"; shift
+refuse() { printf '%s\n' "mzsh: destructive operation refused; use the approved migration or targeted safe command" >&2; exit 64; }
+protected() { local value="$1"; value="${value%/}"; [[ -n $value ]] || value=/; [[ $value = /* ]] || value="$PWD/$value"; value="$(PATH=/usr/bin:/bin:/usr/sbin:/sbin realpath "$value" 2>/dev/null || printf '%s' "$value")"; [[ $value == / || $value == /Users || $value == "${HOME%/}" ]]; }
+case "$command_name" in
+  prisma|npx|bun|bunx|npm|pnpm|yarn) local_args=" $command_name $* "; [[ $local_args == *prisma*db*push* ]] && refuse ;;
+esac
+if [[ $command_name == rm ]]; then
+  recursive=0
+  for arg in "$@"; do
+    case "$arg" in --recursive|-*r*|-*R*) recursive=1;; esac
+  done
+  if (( recursive )); then for arg in "$@"; do [[ $arg != -* ]] && protected "$arg" && refuse; done; fi
+fi
+if [[ $command_name == rsync && " $* " == *--delete* ]]; then for arg in "$@"; do [[ $arg != -* ]] && destination="$arg"; done; protected "${destination:-.}" && refuse; fi
+if [[ $command_name == find && " $* " == *" -delete "* ]]; then for arg in "$@"; do [[ $arg != -* ]] && protected "$arg" && refuse; done; fi
+if [[ $command_name == diskutil ]]; then for arg in "$@"; do case "$arg" in eraseDisk|eraseVolume|repartitionDisk|zeroDisk|randomDisk|secureErase|partitionDisk) refuse;; esac; done; fi
+if [[ $command_name == dd ]]; then for arg in "$@"; do [[ $arg =~ ^of=/dev/r?disk[0-9]+ ]] && refuse; done; fi
+exit 0

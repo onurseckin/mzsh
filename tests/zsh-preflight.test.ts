@@ -15,9 +15,13 @@ function plan(repository: string): AdoptionPlan {
 
 describe("stable loader rendering", () => {
   test("uses the shared quiet interactive and login boundaries", () => {
-    expect(renderStableLoader(".zshrc")).toContain("[[ -o interactive ]] || return 0");
+    const interactive = renderStableLoader(".zshrc");
+    expect(interactive).toContain("[[ -o interactive ]] || return 0");
     expect(renderStableLoader(".zprofile")).toContain("[[ -o login ]] || return 0");
     expect(renderStableLoader(".zshenv")).toContain("mzsh-managed-loader");
+    expect(interactive).toContain("p10k-instant-prompt-${(%):-%n}.zsh");
+    expect(interactive.indexOf("p10k-instant-prompt")).toBeLessThan(interactive.indexOf("/mzsh/current/loaders/zshrc.zsh"));
+    expect(interactive).toContain("[[ -r $mzsh_instant_prompt && ! -L $mzsh_instant_prompt ]]");
   });
 
   test("syntax-checks an isolated portable checkout and fails closed for invalid syntax", () => {
