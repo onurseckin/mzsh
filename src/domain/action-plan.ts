@@ -16,6 +16,12 @@ export interface ReviewedPlan {
   createdAt: string;
 }
 
+export interface ReviewedPlanMatch {
+  id: string;
+  action: ReviewedAction;
+  fingerprint: string;
+}
+
 export interface CreateReviewedPlanInput {
   id: string;
   action: ReviewedAction;

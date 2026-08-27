@@ -120,4 +120,58 @@ describe('reviewed plan application', () => {
     expect(executed).toBe(false);
     expect(history.records).toEqual([]);
   });
+
+  test('retains a reviewed plan for an exact retry after rejected input', () => {
+    const store = new InMemoryPlanStore();
+    const reviewed = plan();
+    const service = new ReviewedPlanApplicationService(store, new RecordingHistory());
+    let executions = 0;
+    store.save(reviewed);
+
+    for (const input of [
+      { confirmation: 'apply', action: 'bootstrap' as const, fingerprint: reviewed.fingerprint },
+      { confirmation: 'APPLY', action: 'update' as const, fingerprint: reviewed.fingerprint },
+      { confirmation: 'APPLY', action: 'bootstrap' as const, fingerprint: 'b'.repeat(64) },
+    ]) {
+      expect(() =>
+        service.apply({
+          planId: reviewed.id,
+          ...input,
+          now,
+          snapshot,
+          execute: () => {
+            executions += 1;
+          },
+        })
+      ).toThrow('PLAN_CONFIRMATION_REQUIRED');
+      expect(store.find(reviewed.id)).toEqual(reviewed);
+    }
+
+    service.apply({
+      planId: reviewed.id,
+      confirmation: 'APPLY',
+      action: 'bootstrap',
+      fingerprint: reviewed.fingerprint,
+      now,
+      snapshot,
+      execute: () => {
+        executions += 1;
+      },
+    });
+    expect(executions).toBe(1);
+    expect(() =>
+      service.apply({
+        planId: reviewed.id,
+        confirmation: 'APPLY',
+        action: 'bootstrap',
+        fingerprint: reviewed.fingerprint,
+        now,
+        snapshot,
+        execute: () => {
+          executions += 1;
+        },
+      })
+    ).toThrow('PLAN_CONFIRMATION_REQUIRED');
+    expect(executions).toBe(1);
+  });
 });

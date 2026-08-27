@@ -1,4 +1,4 @@
-import type { ReviewedPlan } from '../domain/action-plan';
+import type { ReviewedPlan, ReviewedPlanMatch } from '../domain/action-plan';
 import type { DurablePlanStore } from '../domain/history';
 
 export class InMemoryPlanStore implements DurablePlanStore {
@@ -12,9 +12,15 @@ export class InMemoryPlanStore implements DurablePlanStore {
     return this.plans.get(id);
   }
 
-  consume(id: string): ReviewedPlan | undefined {
-    const plan = this.plans.get(id);
-    if (plan !== undefined) this.plans.delete(id);
+  consume(match: ReviewedPlanMatch): ReviewedPlan | undefined {
+    const plan = this.plans.get(match.id);
+    if (
+      plan === undefined ||
+      plan.action !== match.action ||
+      plan.fingerprint !== match.fingerprint
+    )
+      return undefined;
+    this.plans.delete(match.id);
     return plan;
   }
 }

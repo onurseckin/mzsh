@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import type {
   AdoptionReceipt,
@@ -312,6 +313,34 @@ export function rollbackAdoption(
       code: compensationFailed ? 'rollback-compensation-failed' : 'rollback-failed',
       path: input.receiptPath,
     };
+  }
+}
+
+export function rollbackStateDigest(
+  input: RollbackAdoptionInput,
+  dependencies: RollbackAdoptionDependencies
+): string | undefined {
+  const receipt = parseReceipt(dependencies.filesystem, input.receiptPath);
+  if (receipt === undefined) return undefined;
+  try {
+    const receiptState = dependencies.filesystem.describe(input.receiptPath);
+    if (receiptState.kind !== 'file' || receiptState.hash === undefined) return undefined;
+    const targets = receipt.targets.map((target) => {
+      const current = dependencies.filesystem.describe(target.applied.path);
+      if (!sameState(target.applied, current)) return undefined;
+      return {
+        category: target.category,
+        kind: current.kind,
+        mode: current.mode ?? null,
+        hash: current.hash ?? null,
+      };
+    });
+    if (targets.some((target) => target === undefined)) return undefined;
+    return createHash('sha256')
+      .update(JSON.stringify({ receiptHash: receiptState.hash, targets }))
+      .digest('hex');
+  } catch {
+    return undefined;
   }
 }
 

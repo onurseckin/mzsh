@@ -3,6 +3,7 @@ import {
   type RedactedTargetName,
   type ReviewedAction,
   type ReviewedPlan,
+  type ReviewedPlanMatch,
 } from './action-plan';
 
 export type RecoveryTargetState = 'absent' | 'file' | 'symlink' | 'directory' | 'other';
@@ -59,5 +60,5 @@ export interface HistoryStore {
 export interface DurablePlanStore {
   save(plan: ReviewedPlan): void;
   find(id: string): ReviewedPlan | undefined;
-  consume(id: string): ReviewedPlan | undefined;
+  consume(match: ReviewedPlanMatch): ReviewedPlan | undefined;
 }

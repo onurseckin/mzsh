@@ -137,6 +137,50 @@ describe('SQLite history', () => {
     history.close();
   });
 
+  test('allows one execution when independent services contend for a reviewed plan', () => {
+    const directory = join(fixture(), 'state');
+    const primary = new SqliteHistory(directory);
+    const contender = new SqliteHistory(directory);
+    const plan = createReviewedPlan({
+      id: '4b5fd2fd-2f80-4ce9-a8f3-5c12dfacbe49',
+      action: 'bootstrap',
+      targetNames: ['managed-loader'],
+      fingerprint: 'a'.repeat(64),
+      now: new Date('2026-08-27T00:00:00.000Z'),
+    });
+    const requests = [
+      new ReviewedPlanApplicationService(primary, primary),
+      new ReviewedPlanApplicationService(contender, contender),
+    ];
+    let executions = 0;
+    primary.save(plan);
+
+    const results = requests.map((service) => {
+      try {
+        service.apply({
+          planId: plan.id,
+          confirmation: 'APPLY',
+          action: 'bootstrap',
+          fingerprint: plan.fingerprint,
+          now: new Date('2026-08-27T00:00:00.000Z'),
+          snapshot: () => record(plan.id).snapshot,
+          execute: () => {
+            executions += 1;
+          },
+        });
+        return 'applied';
+      } catch (error) {
+        expect(error).toHaveProperty('message', 'PLAN_CONFIRMATION_REQUIRED');
+        return 'rejected';
+      }
+    });
+
+    expect(results).toEqual(['applied', 'rejected']);
+    expect(executions).toBe(1);
+    primary.close();
+    contender.close();
+  });
+
   test('marks only the failed attempt when guarded execution throws', () => {
     const history = new SqliteHistory(join(fixture(), 'state'));
     const plan = createReviewedPlan({

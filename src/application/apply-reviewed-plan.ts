@@ -12,7 +12,7 @@ export interface ApplyReviewedPlanInput<Result> {
   planId?: string;
   confirmation?: string;
   action: ReviewedAction;
-  fingerprint: string;
+  fingerprint?: string;
   now: Date;
   snapshot(): RecoverySnapshot;
   execute(): Result;
@@ -25,15 +25,18 @@ export class ReviewedPlanApplicationService {
   ) {}
 
   apply<Result>(input: ApplyReviewedPlanInput<Result>): Result {
-    const plan = input.planId === undefined ? undefined : this.plans.consume(input.planId);
     if (
-      plan === undefined ||
+      input.planId === undefined ||
       input.confirmation !== 'APPLY' ||
-      plan.action !== input.action ||
-      plan.fingerprint !== input.fingerprint
-    ) {
+      input.fingerprint === undefined
+    )
       throw new Error('PLAN_CONFIRMATION_REQUIRED');
-    }
+    const plan = this.plans.consume({
+      id: input.planId,
+      action: input.action,
+      fingerprint: input.fingerprint,
+    });
+    if (plan === undefined) throw new Error('PLAN_CONFIRMATION_REQUIRED');
     const snapshot = input.snapshot();
     const attemptId = randomUUID();
     this.history.record({

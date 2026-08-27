@@ -1,10 +1,10 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import { applyAdoption } from '../application/apply-adoption';
 import { ReviewedPlanApplicationService } from '../application/apply-reviewed-plan';
 import { auditEnvironment } from '../application/audit-environment';
 import { adoptionPlanFingerprint, planAdoption } from '../application/plan-adoption';
-import { rollbackAdoption } from '../application/rollback-adoption';
+import { rollbackAdoption, rollbackStateDigest } from '../application/rollback-adoption';
 import { classifySensitiveAssignment } from '../application/sensitive-assignment-policy';
 import type { AdoptionPlan, AdoptionApplyResult, AdoptionRollbackResult } from '../domain/adoption';
 import type { EnvironmentSnapshot } from '../domain/audit';
@@ -43,6 +43,7 @@ export interface RunMzshCliDependencies {
   reviewedPlanId?: () => string;
   apply?: typeof applyAdoption;
   rollback?: typeof rollbackAdoption;
+  rollbackStateDigest?: typeof rollbackStateDigest;
 }
 
 function isSuccess(result: AdoptionApplyResult | AdoptionRollbackResult): boolean {
@@ -75,10 +76,6 @@ function planSummary(plan: AdoptionPlan): object {
 
 function reviewedPlanId(dependencies: RunMzshCliDependencies): string {
   return (dependencies.reviewedPlanId ?? randomUUID)();
-}
-
-function rollbackFingerprint(config: string, receiptId: string): string {
-  return createHash('sha256').update(`${config}:${receiptId}`).digest('hex');
 }
 
 function historyDirectory(dependencies: RunMzshCliDependencies): string {
@@ -159,7 +156,10 @@ export function runMzshCli(args: readonly string[], dependencies: RunMzshCliDepe
       parsed.receiptId,
       'receipt.json'
     );
-    const fingerprint = rollbackFingerprint(dependencies.xdgConfig, parsed.receiptId);
+    const fingerprint = (dependencies.rollbackStateDigest ?? rollbackStateDigest)(
+      { receiptPath, dryRun: true },
+      { filesystem }
+    );
     if (!parsed.apply) {
       const result = (dependencies.rollback ?? rollbackAdoption)(
         { receiptPath, dryRun: true },
@@ -169,6 +169,11 @@ export function runMzshCli(args: readonly string[], dependencies: RunMzshCliDepe
         history.close();
         dependencies.write(JSON.stringify(result));
         return isSuccess(result) ? 0 : 1;
+      }
+      if (fingerprint === undefined) {
+        history.close();
+        dependencies.write('MZSH_ROLLBACK_STATE_UNAVAILABLE');
+        return 1;
       }
       const reviewed = createReviewedPlan({
         id: reviewedPlanId(dependencies),

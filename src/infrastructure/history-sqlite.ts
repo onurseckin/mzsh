@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 import { join } from 'node:path';
-import { isReviewedPlanId, type ReviewedPlan } from '../domain/action-plan';
+import { isReviewedPlanId, type ReviewedPlan, type ReviewedPlanMatch } from '../domain/action-plan';
 import type {
   DurablePlanStore,
   HistoryRecord,
@@ -70,13 +70,24 @@ export class SqliteHistory implements DurablePlanStore, HistoryStore {
     return this.findStored(id);
   }
 
-  consume(id: string): ReviewedPlan | undefined {
+  consume(match: ReviewedPlanMatch): ReviewedPlan | undefined {
     this.enforceRetention();
     this.database.run('BEGIN IMMEDIATE');
     try {
-      const plan = this.findStored(id);
-      if (plan !== undefined)
-        this.database.query<never, [string]>('DELETE FROM reviewed_plans WHERE id = ?').run(id);
+      const plan = this.findStored(match.id);
+      if (
+        plan === undefined ||
+        plan.action !== match.action ||
+        plan.fingerprint !== match.fingerprint
+      ) {
+        this.database.run('COMMIT');
+        return undefined;
+      }
+      this.database
+        .query<never, [string, string, string]>(
+          'DELETE FROM reviewed_plans WHERE id = ? AND action = ? AND fingerprint = ?'
+        )
+        .run(match.id, match.action, match.fingerprint);
       this.database.run('COMMIT');
       return plan;
     } catch (error) {

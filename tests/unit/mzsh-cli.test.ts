@@ -217,6 +217,7 @@ describe('MZSH managed CLI', () => {
         write: (_message: string) => undefined,
         id: () => 'update-tx',
         reviewedPlanId: () => '4b5fd2fd-2f80-4ce9-a8f3-5c12dfacbe50',
+        rollbackStateDigest: () => 'a'.repeat(64),
         apply: () => {
           applied += 1;
           return { kind: 'applied' as const, receiptPath: 'receipt' };
@@ -271,6 +272,48 @@ describe('MZSH managed CLI', () => {
         `${join(fixture.config, 'mzsh', 'state', 'receipt_1', 'receipt.json')}:false`,
       ]);
       expect(runMzshCli(['rollback', '../escape'], dependencies)).toBe(2);
+    } finally {
+      rmSync(fixture.root, { recursive: true, force: true });
+    }
+  });
+
+  test('rejects a changed rollback digest before mutation and preserves the reviewed plan', () => {
+    const fixture = cliFixture();
+    try {
+      const rollbackPaths: string[] = [];
+      let digest = 'a'.repeat(64);
+      const dependencies = {
+        home: fixture.home,
+        xdgConfig: fixture.config,
+        xdgCache: join(fixture.home, '.cache'),
+        repositoryRoot: fixture.repository,
+        write: (_message: string) => undefined,
+        reviewedPlanId: () => '7f0b4527-2590-4c25-864d-57d484979f11',
+        rollbackStateDigest: () => digest,
+        rollback: (input: { receiptPath: string; dryRun: boolean }) => {
+          rollbackPaths.push(`${input.receiptPath}:${input.dryRun}`);
+          return input.dryRun
+            ? { kind: 'ready' as const, dryRun: true as const, paths: [] }
+            : { kind: 'rolled-back' as const, paths: [] };
+        },
+      };
+      const applyArgs = [
+        'rollback',
+        'receipt_1',
+        '--apply',
+        '--plan-id',
+        '7f0b4527-2590-4c25-864d-57d484979f11',
+        '--confirm',
+        'APPLY',
+      ];
+
+      expect(runMzshCli(['rollback', 'receipt_1'], dependencies)).toBe(0);
+      digest = 'b'.repeat(64);
+      expect(runMzshCli(applyArgs, dependencies)).toBe(1);
+      expect(rollbackPaths).toHaveLength(1);
+      digest = 'a'.repeat(64);
+      expect(runMzshCli(applyArgs, dependencies)).toBe(0);
+      expect(rollbackPaths.map((entry) => entry.endsWith(':false'))).toEqual([false, false, true]);
     } finally {
       rmSync(fixture.root, { recursive: true, force: true });
     }
