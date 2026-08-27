@@ -1,0 +1,212 @@
+# MZSH product decisions checkpoint
+
+## Status
+
+Design in progress
+
+## Date
+
+2026-08-27
+
+## Purpose
+
+This is durable architecture documentation. It records accepted product
+direction and its remaining deliberate decisions. It is not a temporary
+feature plan, an implementation handoff, or authorization to change behavior
+without the corresponding design, security, and test work.
+
+It complements the [documentation and safety portability design](documentation-and-safety-portability-design.md).
+That document describes the approved documentation information architecture
+and current managed-shell safety scope. This checkpoint records the broader
+product direction that future architecture and implementation work must honor.
+
+## Context
+
+MZSH currently provides a local, receipt-backed managed Zsh topology. Its
+adoption transaction, isolated preflight, rollback receipts, portable module
+manifest, and safety shims establish a narrow ownership boundary. The intended
+product expands that foundation into a global developer-tool workflow without
+turning installation, inventory, or shell startup into an unbounded machine
+manager.
+
+The current checkout-local command flow remains the implemented and supported
+reality until a reviewed global release path exists. The decisions below define
+the future product boundary; they do not retroactively claim that unreleased
+commands, artifacts, or services exist.
+
+## Accepted product decisions
+
+### Setup, update, and distribution
+
+- Setup update uses a safe, clean, fast-forward model. It must not discard
+  local changes, silently merge divergent work, or overwrite unowned state.
+- The intended installed lifecycle is global GitHub Bun installation followed
+  by `mzsh setup`. Exact release-artifact mechanics remain an open decision.
+- `setup` is idempotent and defaults to the current user's home directory. It
+  plans first, reports its ownership boundary, and requires the applicable
+  confirmation before mutation.
+- Setup and update are one coherent lifecycle. The managed tool targets LTS or
+  stable releases only; it does not silently switch users to experimental or
+  pre-release channels.
+- Update and remove operations require an explicit reviewed plan identifier
+  and a mandatory confirmation. A successful-looking command name is never
+  evidence that a mutation is authorized.
+- Commits and pushes are permitted at reviewed milestones. Temporary completed
+  planning artifacts are removed once their durable architecture, guide,
+  reference, or decision content has an approved canonical home.
+
+### Machine-manifest boundary
+
+- A version-controlled machine manifest describes the complete public
+  developer-tool and shell configuration boundary. It may declare supported
+  tool intent, shell modules, categories, runtime links, and placeholders for
+  private values.
+- The manifest must contain no secret values. Private values remain outside
+  version control and are resolved only through an explicitly private boundary.
+- Personal application data, operating-system preference state, and project
+  databases are out of scope. The manifest is not a general backup, migration,
+  or workstation cloning format.
+- Custom categories are versioned, nonsecret metadata. Their identity,
+  display metadata, and supported inventory behavior are public contracts.
+- Machine runtime links are versioned declarations of a boundary, not formula
+  selection, package installation, network access, or arbitrary shell
+  execution during startup.
+
+### Inventory, categories, and history
+
+- Inventory is observation-first. Providers report facts and metadata before
+  any action planner offers a change; discovery does not imply ownership or
+  authorization to mutate.
+- A category registry supplies stable category identity and display metadata.
+  Inventory providers remain independently testable and must not hard-code UI
+  routing or mutation behavior.
+- Action history uses Bun SQLite with a 30-day retention policy. History,
+  snapshots, and associated state are owner-only; the product exposes history
+  commands rather than requiring filesystem inspection.
+- Stored history is operational evidence, not a secret store. It records the
+  minimum redacted plan, result, and recovery metadata needed to explain a
+  completed or failed action.
+
+### Terminal interface and command contract
+
+- The default interactive experience is a Neovim-like full-screen terminal
+  interface. Space is the leader key, discoverable shortcuts remain visible,
+  and editor resolution is explicit rather than inferred from a command shell.
+- The terminal interface, command-line parser, help output, automation output,
+  and confirmation screens share one command and help schema. Renderers do not
+  independently define flags, action semantics, or safety checks.
+- The product retains a secure environment list/get/set surface. Listing and
+  display behavior is redacted by default; get/set guidance remains locked to
+  the approved private-boundary contract and must not expose values in normal
+  output, history, receipts, or diagnostics.
+
+### Authentication and sensitive data
+
+- An operating-system-handled, configurable 24-hour authentication lease is
+  part of the product design. It is implemented last, after local planning,
+  confirmation, mutation boundaries, recovery, and history are independently
+  reliable.
+- Lease acquisition is an external authorization boundary, not a replacement
+  for local plan validation, receipts, confirmation, or rollback safety.
+- Redaction uses name provenance and prefix matching compatible with the
+  established ProxAI Gateway policy. The product does not disclose matched
+  names, values, source lines, or private configuration while explaining a
+  redaction decision.
+- Locked environment get/set guidance must name the approved workflow without
+  teaching value extraction, copying private content into the repository, or
+  weakening owner-only storage requirements.
+
+### Documentation, providers, and safety hardening
+
+- The approved documentation information architecture and navigation model in
+  the linked safety portability design remain authoritative: concise README,
+  architecture explanations, goal-focused guides, exact reference, and
+  numbered decisions with one canonical owner per fact.
+- `.cursor` is removed only after repository-owned, provider-neutral guidance
+  exists at the root `AGENTS.md` and in `.agents/`. Those guides describe MZSH
+  safety, Bun commands, validation, private-boundary, and contribution rules
+  without binding the project to one agent provider.
+- Safety hardening stays within the approved managed loader, receipt,
+  preflight, runtime-path, completion, and shim boundaries. Guardrails reduce
+  known command risks; they are not a sandbox, authorization system, or a
+  promise to contain arbitrary programs.
+- The managed shell remains receipt-backed and loader-only. Installers and
+  integrations may not append unmanaged startup mutations as an alternate
+  ownership path.
+
+## Non-goals
+
+- Installing packages, selecting tool versions, or invoking a network client
+  as a side effect of sourcing portable shell modules.
+- Reading, copying, serializing, or displaying private values as part of
+  inventory, manifests, history, diagnostics, documentation, or tests.
+- Managing personal application data, operating-system preferences, project
+  databases, arbitrary project files, or general workstation state.
+- Treating command guards, a terminal UI, a confirmation prompt, or an auth
+  lease as a substitute for ownership validation and reversible transactions.
+
+## Open architecture decisions
+
+These decisions are intentionally unresolved. They must be selected through a
+reviewed architecture decision before implementation depends on them.
+
+1. Runtime, language, terminal-interface, and command-line stack: choose
+   libraries and process boundaries that can implement the shared schema,
+   fullscreen interaction, and existing Bun workflow without duplicating the
+   current parser/router.
+2. Global release artifact: define the exact GitHub-distributed artifact,
+   provenance verification, install location, version discovery, clean
+   fast-forward update rules, and recovery when the local installation changes.
+3. Security-comment policy: decide whether narrowly scoped comments explaining
+   security and rollback invariants remain permitted, or whether all rationale
+   must live in architecture documents while code contains none.
+4. Bun no-isolate concurrency rollout: complete a shared-state audit and set
+   fixture, environment, module-registry, and database isolation rules before
+   enabling concurrent no-isolate execution as a required gate.
+5. Authentication provider mechanics: choose the operating-system integration,
+   lease storage, renewal and expiry behavior, offline semantics, revocation,
+   and the exact actions that require a valid lease.
+
+## Consequences for future work
+
+- Global distribution, the terminal interface, SQLite history, inventory, and
+  authentication must compose existing plan/apply/rollback safety contracts;
+  none may create an independent unreceipted mutation route.
+- Machine-manifest planning must be separable from applying it, so every
+  destructive-capable action can show a stable plan identifier and be retried
+  or recovered from recorded owner-only state.
+- The category registry and inventory providers are domain contracts. They
+  should be introduced before renderer-specific menus or full-screen screens.
+- Documentation migration must preserve the existing local-only forms until
+  global release details and tests make new forms true. A future global command
+  reference is not a reason to publish speculative installation instructions.
+- Removing provider-specific guidance, temporary plans, or obsolete command
+  paths is a compatibility migration with link, command, and safety checks;
+  it is not a bulk deletion exercise.
+
+## Review criteria
+
+Future work is consistent with this checkpoint only if it demonstrates all of
+the following:
+
+- no secret or personal content crosses a public, persisted, or diagnostic
+  boundary;
+- every mutation has an owned target set, reviewed plan identifier, explicit
+  confirmation, durable result, and defined recovery path;
+- inventory remains observational until an authorized plan is applied;
+- terminal and command-line surfaces present the same actions and help;
+- shell startup remains deterministic, private-last, and free of package,
+  network, or arbitrary executable configuration evaluation;
+- history, snapshots, runtime links, receipts, and lease state remain
+  owner-only; and
+- docs distinguish implemented checkout-local behavior from future global
+  distribution behavior.
+
+## Self-review record
+
+This checkpoint contains no credential material, personal paths, placeholder
+tasks, or unapproved installation syntax. The future lifecycle name is an
+accepted product decision; the global artifact and CLI stack remain explicitly
+unresolved. It uses no fenced commands. Its only link is relative and points
+to an existing architecture document. The document is a durable decision record
+and remains below the repository line limit.

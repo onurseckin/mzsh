@@ -2,7 +2,7 @@
 
 ## Status and scope
 
-Status: approved design for a documentation-only implementation lane.
+Status: approved design for a documentation-only implementation lane; see the [product decisions checkpoint](mzsh-product-decisions.md) for durable broader product direction.
 
 This specification defines the repository documentation structure and the
 documentation contracts for MZSH's managed shell, adoption transaction, and
