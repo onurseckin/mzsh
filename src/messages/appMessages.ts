@@ -1,7 +1,8 @@
-/**
- * Application Messages
- * Centralized messages for main application functionality
- */
+import { catalog, renderCatalogUsage } from '../catalog/command-catalog';
+
+const managedExamples = catalog.commands
+  .filter((command) => command.available)
+  .map((command) => `bun run mzsh -- ${renderCatalogUsage(command.name, 'checkout')}`);
 
 export const appMessages = {
   // Error messages with actionable guidance
@@ -47,22 +48,14 @@ export const appMessages = {
   // Help content
   help: {
     description: 'Managed Zsh configuration migration and inspection tool',
-    usage: 'bun run mzsh -- [audit|bootstrap|update|rollback] [OPTIONS]',
+    usage: 'bun run mzsh -- <command> [OPTIONS]',
     options: {
       openType: '-o, --open-type <type>  Open a managed or legacy migration-context file',
-      update:
-        'bun run mzsh -- update [--source <path>] [--apply]  Plan or apply a local managed update',
-      bootstrap:
-        'bun run mzsh -- bootstrap --source <path> [--apply]  Plan or apply initial adoption',
-      rollback:
-        'bun run mzsh -- rollback <receipt-id> [--apply]  Restore one recorded adoption transaction',
+      update: `bun run mzsh -- ${renderCatalogUsage('update', 'checkout')}  ${catalog.require('update').summary}`,
+      bootstrap: `bun run mzsh -- ${renderCatalogUsage('bootstrap', 'checkout')}  ${catalog.require('bootstrap').summary}`,
+      rollback: `bun run mzsh -- ${renderCatalogUsage('rollback', 'checkout')}  ${catalog.require('rollback').summary}`,
       help: '-h, --help              Show help',
     },
-    examples: [
-      'bun run mzsh -- audit',
-      'bun run mzsh -- bootstrap --source /absolute/mzsh-checkout',
-      'bun run mzsh -- update --source /absolute/mzsh-checkout',
-      'bun run mzsh -- rollback receipt-id',
-    ],
+    examples: managedExamples,
   },
 } as const;

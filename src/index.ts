@@ -19,7 +19,7 @@ import { InteractiveMenu } from './interactiveMenu';
 import { appMessages, formatMessage } from './messages';
 import { type OpenType, getAvailableOpenTypes, getOpenConfig, isValidOpenType } from './openConfig';
 import { runMzshCli } from './cli/run-cli';
-import { catalog } from './catalog/command-catalog';
+import { catalog, renderCatalogUsage } from './catalog/command-catalog';
 import { createCommanderAdapter } from './catalog/commander-adapter';
 import { resolve } from 'node:path';
 
@@ -36,15 +36,9 @@ export function isManagedCliRoute(args: readonly string[]): boolean {
   );
 }
 
-const implementedCatalogCommands = ['audit', 'bootstrap', 'update', 'rollback'] as const;
-
-export const checkoutLocalCommandLines = [
-  ...implementedCatalogCommands.map(
-    (name) => `  bun run mzsh -- ${catalog.require(name).checkoutUsage}`
-  ),
-  '  bun run mzsh -- audit --json',
-  '  bun run mzsh -- bootstrap --source /absolute/mzsh-checkout',
-] as const;
+export const checkoutLocalCommandLines = catalog.commands
+  .filter((command) => command.available)
+  .map((command) => `  bun run mzsh -- ${renderCatalogUsage(command.name, 'checkout')}`);
 
 /**
  * ZshrcManager - Main command class for the mzsh CLI tool
@@ -64,13 +58,9 @@ export default class ZshrcManager extends Command {
   /** Human-readable description shown in help output */
   static override description = 'Interactive zsh configuration file manager';
 
-  /** Example usage patterns displayed in help documentation */
-  static override examples = [
-    'bun run mzsh -- audit --json',
-    'bun run mzsh -- bootstrap --source /absolute/mzsh-checkout',
-    'bun run mzsh -- update --source /absolute/mzsh-checkout --apply',
-    'bun run mzsh -- rollback receipt-id --apply',
-  ];
+  static override examples = catalog.commands
+    .filter((command) => command.available)
+    .map((command) => `bun run mzsh -- ${renderCatalogUsage(command.name, 'checkout')}`);
 
   /**
    * Command-line flags configuration

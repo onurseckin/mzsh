@@ -1,16 +1,3 @@
-export const catalogCommandNames = [
-  'audit',
-  'bootstrap',
-  'update',
-  'rollback',
-  'setup',
-  'history',
-  'inventory',
-  'env',
-  'tui',
-] as const;
-
-export type CatalogCommandName = (typeof catalogCommandNames)[number];
 export type CommandRisk = 'read-only' | 'destructive' | 'sensitive';
 
 export type CatalogFlag =
@@ -20,46 +7,59 @@ export type CatalogFlag =
   | { name: 'legacy-source'; value: 'absolute-path'; description: string; required?: boolean };
 
 export type CatalogParser =
-  | {
-      kind: 'audit';
-      flags: readonly [CatalogFlag, CatalogFlag];
-      positional: 'none';
-    }
-  | {
-      kind: 'bootstrap';
-      flags: readonly [CatalogFlag, CatalogFlag, CatalogFlag];
-      positional: 'none';
-    }
-  | {
-      kind: 'update';
-      flags: readonly [CatalogFlag, CatalogFlag];
-      positional: 'none';
-    }
-  | {
-      kind: 'rollback';
-      flags: readonly [CatalogFlag];
-      positional: 'receipt-id';
-    }
-  | { kind: 'placeholder'; flags: readonly []; positional: 'none' };
+  | { kind: 'audit'; flags: readonly CatalogFlag[]; positional: 'none' }
+  | { kind: 'bootstrap'; flags: readonly CatalogFlag[]; positional: 'none' }
+  | { kind: 'update'; flags: readonly CatalogFlag[]; positional: 'none' }
+  | { kind: 'rollback'; flags: readonly CatalogFlag[]; positional: 'receipt-id' }
+  | { kind: 'placeholder'; flags: readonly CatalogFlag[]; positional: 'none' };
 
-export type CatalogCommand = {
-  [Name in CatalogCommandName]: {
-    name: Name;
-    summary: string;
-    risk: CommandRisk;
-    available: boolean;
-    checkoutUsage: string;
-    parser: Name extends 'audit'
-      ? Extract<CatalogParser, { kind: 'audit' }>
-      : Name extends 'bootstrap'
-        ? Extract<CatalogParser, { kind: 'bootstrap' }>
-        : Name extends 'update'
-          ? Extract<CatalogParser, { kind: 'update' }>
-          : Name extends 'rollback'
-            ? Extract<CatalogParser, { kind: 'rollback' }>
-            : Extract<CatalogParser, { kind: 'placeholder' }>;
-  };
-}[CatalogCommandName];
+export type CatalogPaletteMetadata = {
+  keywords: readonly string[];
+};
+
+export type CatalogCommand =
+  | {
+      name: 'audit';
+      summary: string;
+      risk: CommandRisk;
+      available: true;
+      palette: CatalogPaletteMetadata;
+      parser: Extract<CatalogParser, { kind: 'audit' }>;
+    }
+  | {
+      name: 'bootstrap';
+      summary: string;
+      risk: CommandRisk;
+      available: true;
+      palette: CatalogPaletteMetadata;
+      parser: Extract<CatalogParser, { kind: 'bootstrap' }>;
+    }
+  | {
+      name: 'update';
+      summary: string;
+      risk: CommandRisk;
+      available: true;
+      palette: CatalogPaletteMetadata;
+      parser: Extract<CatalogParser, { kind: 'update' }>;
+    }
+  | {
+      name: 'rollback';
+      summary: string;
+      risk: CommandRisk;
+      available: true;
+      palette: CatalogPaletteMetadata;
+      parser: Extract<CatalogParser, { kind: 'rollback' }>;
+    }
+  | {
+      name: 'setup' | 'history' | 'inventory' | 'env' | 'tui';
+      summary: string;
+      risk: CommandRisk;
+      available: false;
+      palette: CatalogPaletteMetadata;
+      parser: Extract<CatalogParser, { kind: 'placeholder' }>;
+    };
+
+export type CatalogCommandName = CatalogCommand['name'];
 
 export type ManagedCommand =
   | { kind: 'audit'; source?: string; json: boolean }
@@ -69,7 +69,7 @@ export type ManagedCommand =
 
 export type CatalogParseResult =
   | ManagedCommand
-  | { kind: 'catalog-placeholder'; command: Exclude<CatalogCommandName, ManagedCommand['kind']> }
+  | { kind: 'catalog-placeholder'; command: CatalogCommandName }
   | { kind: 'usage-error'; code: string }
   | { kind: 'retired' }
   | { kind: 'unmanaged' };

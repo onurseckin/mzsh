@@ -1,5 +1,10 @@
 import { describe, expect, test } from 'bun:test';
-import { catalog, parseCatalogArgs, renderCatalogHelp } from '../../../src/catalog/command-catalog';
+import {
+  catalog,
+  parseCatalogArgs,
+  renderCatalogHelp,
+  renderCatalogUsage,
+} from '../../../src/catalog/command-catalog';
 import { renderZshCompletion } from '../../../src/catalog/completion';
 
 describe('command catalog', () => {
@@ -28,6 +33,24 @@ describe('command catalog', () => {
       kind: 'usage-error',
       code: 'invalid-flags',
     });
+    expect(parseCatalogArgs(['bootstrap', '--source', '/checkout', '--apply', '--apply'])).toEqual({
+      kind: 'usage-error',
+      code: 'invalid-flags',
+    });
+    expect(parseCatalogArgs(['audit', '--json', '--json'])).toEqual({
+      kind: 'usage-error',
+      code: 'invalid-flags',
+    });
+    expect(
+      parseCatalogArgs(['bootstrap', '--source', '/checkout', '--source', 'relative'])
+    ).toEqual({
+      kind: 'usage-error',
+      code: 'absolute-path-required',
+    });
+    expect(parseCatalogArgs(['bootstrap', '--source', '/checkout', '--source', '/other'])).toEqual({
+      kind: 'usage-error',
+      code: 'duplicate-flag',
+    });
   });
 
   test('lists future product commands without making them executable', () => {
@@ -51,5 +74,24 @@ describe('command catalog', () => {
     expect(completion).toContain('rollback');
     expect(completion).toContain('--apply');
     expect(completion).toContain('inventory');
+    expect(completion).toContain('--legacy-source');
+  });
+
+  test('derives help and checkout usage from the bootstrap flag grammar', () => {
+    expect(renderCatalogUsage('bootstrap', 'help')).toBe(
+      'bootstrap --source absolute-path [--legacy-source absolute-path] [--apply]'
+    );
+    expect(renderCatalogUsage('bootstrap', 'checkout')).toBe(
+      'bootstrap --source /absolute/checkout [--legacy-source /absolute/file] [--apply]'
+    );
+    expect(renderCatalogHelp('bootstrap')).toContain(renderCatalogUsage('bootstrap', 'help'));
+  });
+
+  test('keeps placeholder flags unavailable through the same catalog grammar', () => {
+    expect(catalog.require('setup').parser.flags).toEqual([]);
+    expect(parseCatalogArgs(['setup', '--apply'])).toEqual({
+      kind: 'usage-error',
+      code: 'invalid-flags',
+    });
   });
 });

@@ -6,7 +6,6 @@ import type {
   CatalogParseResult,
   CommandCatalog,
 } from './types';
-import { catalogCommandNames } from './types';
 
 const applyFlag: CatalogFlag = {
   name: 'apply',
@@ -35,7 +34,7 @@ const commands: readonly CatalogCommand[] = [
     summary: 'Inspect the local managed-shell environment.',
     risk: 'read-only',
     available: true,
-    checkoutUsage: 'audit [--source /absolute/checkout] [--json]',
+    palette: { keywords: ['audit', 'inspect'] },
     parser: { kind: 'audit', flags: [sourceFlag, jsonFlag], positional: 'none' },
   },
   {
@@ -43,7 +42,7 @@ const commands: readonly CatalogCommand[] = [
     summary: 'Plan or apply initial managed-shell adoption.',
     risk: 'destructive',
     available: true,
-    checkoutUsage: 'bootstrap --source /absolute/checkout [--apply]',
+    palette: { keywords: ['bootstrap', 'adopt'] },
     parser: {
       kind: 'bootstrap',
       flags: [{ ...sourceFlag, required: true }, legacySourceFlag, applyFlag],
@@ -55,7 +54,7 @@ const commands: readonly CatalogCommand[] = [
     summary: 'Plan or apply a local managed update.',
     risk: 'destructive',
     available: true,
-    checkoutUsage: 'update [--source /absolute/checkout] [--apply]',
+    palette: { keywords: ['update', 'plan'] },
     parser: { kind: 'update', flags: [sourceFlag, applyFlag], positional: 'none' },
   },
   {
@@ -63,7 +62,7 @@ const commands: readonly CatalogCommand[] = [
     summary: 'Restore one recorded adoption transaction.',
     risk: 'destructive',
     available: true,
-    checkoutUsage: 'rollback receipt-id [--apply]',
+    palette: { keywords: ['rollback', 'receipt'] },
     parser: { kind: 'rollback', flags: [applyFlag], positional: 'receipt-id' },
   },
   {
@@ -71,7 +70,7 @@ const commands: readonly CatalogCommand[] = [
     summary: 'Set up the managed MZSH lifecycle.',
     risk: 'destructive',
     available: false,
-    checkoutUsage: 'setup',
+    palette: { keywords: ['setup', 'install'] },
     parser: { kind: 'placeholder', flags: [], positional: 'none' },
   },
   {
@@ -79,7 +78,7 @@ const commands: readonly CatalogCommand[] = [
     summary: 'Inspect recorded managed action history.',
     risk: 'read-only',
     available: false,
-    checkoutUsage: 'history',
+    palette: { keywords: ['history', 'receipts'] },
     parser: { kind: 'placeholder', flags: [], positional: 'none' },
   },
   {
@@ -87,7 +86,7 @@ const commands: readonly CatalogCommand[] = [
     summary: 'Inspect observed machine inventory.',
     risk: 'read-only',
     available: false,
-    checkoutUsage: 'inventory',
+    palette: { keywords: ['inventory', 'discover'] },
     parser: { kind: 'placeholder', flags: [], positional: 'none' },
   },
   {
@@ -95,7 +94,7 @@ const commands: readonly CatalogCommand[] = [
     summary: 'Access the private environment boundary.',
     risk: 'sensitive',
     available: false,
-    checkoutUsage: 'env',
+    palette: { keywords: ['env', 'private'] },
     parser: { kind: 'placeholder', flags: [], positional: 'none' },
   },
   {
@@ -103,13 +102,13 @@ const commands: readonly CatalogCommand[] = [
     summary: 'Open the full-screen MZSH interface.',
     risk: 'read-only',
     available: false,
-    checkoutUsage: 'tui',
+    palette: { keywords: ['tui', 'interactive'] },
     parser: { kind: 'placeholder', flags: [], positional: 'none' },
   },
 ];
 
 function hasCommand(name: string): name is CatalogCommandName {
-  return catalogCommandNames.includes(name as CatalogCommandName);
+  return commands.some((command) => command.name === name);
 }
 
 function requireCommand(name: CatalogCommandName): CatalogCommand {
@@ -125,40 +124,40 @@ export const catalog: CommandCatalog = {
 };
 
 const retired = new Set(['--update', '--reinstall', '--uninst']);
-const knownFlagNames = new Set(['apply', 'json', 'source', 'legacy-source']);
+const knownFlagNames = new Set(
+  catalog.commands.flatMap((command) => command.parser.flags.map((flag) => flag.name))
+);
+
+export type CatalogUsageStyle = 'help' | 'checkout';
 
 function flagFor(command: CatalogCommand, name: string): CatalogFlag | undefined {
   return command.parser.flags.find((flag) => flag.name === name);
 }
 
-function formatFlag(flag: CatalogFlag): string {
-  return flag.value === 'boolean' ? `--${flag.name}` : `--${flag.name} absolute-path`;
+function formatFlagValue(flag: CatalogFlag, style: CatalogUsageStyle): string {
+  if (flag.value === 'boolean') return `--${flag.name}`;
+  if (style === 'help') return `--${flag.name} absolute-path`;
+  return flag.name === 'legacy-source'
+    ? `--${flag.name} /absolute/file`
+    : `--${flag.name} /absolute/checkout`;
 }
 
-function formatUsage(command: CatalogCommand): string {
+function formatUsage(command: CatalogCommand, style: CatalogUsageStyle): string {
   const positional = command.parser.positional === 'receipt-id' ? ' receipt-id' : '';
   const flags = command.parser.flags
     .map((flag) => {
-      const value = formatFlag(flag);
+      const value = formatFlagValue(flag, style);
       return flag.required ? value : `[${value}]`;
     })
     .join(' ');
   return `${command.name}${positional}${flags.length === 0 ? '' : ` ${flags}`}`;
 }
 
-function placeholderResult(
-  command: CatalogCommandName
-): Extract<CatalogParseResult, { kind: 'catalog-placeholder' }> {
-  switch (command) {
-    case 'setup':
-    case 'history':
-    case 'inventory':
-    case 'env':
-    case 'tui':
-      return { kind: 'catalog-placeholder', command };
-    default:
-      throw new Error(`Catalog command is not a placeholder: ${command}`);
-  }
+export function renderCatalogUsage(
+  commandName: CatalogCommandName,
+  style: CatalogUsageStyle
+): string {
+  return formatUsage(catalog.require(commandName), style);
 }
 
 export function parseCatalogArgs(args: readonly string[]): CatalogParseResult {
@@ -167,12 +166,7 @@ export function parseCatalogArgs(args: readonly string[]): CatalogParseResult {
   if (name === undefined) return { kind: 'unmanaged' };
   if (!catalog.has(name)) return { kind: 'usage-error', code: 'unknown-command' };
   const command = catalog.require(name);
-  if (command.parser.kind === 'placeholder') {
-    return args.length === 1
-      ? placeholderResult(command.name)
-      : { kind: 'usage-error', code: 'unexpected-positional' };
-  }
-  const values = new Map<string, string | true>();
+  const values = new Map<CatalogFlag['name'], string | true>();
   const positionals: string[] = [];
   for (let index = 1; index < args.length; index += 1) {
     const token = args[index]!;
@@ -184,11 +178,13 @@ export function parseCatalogArgs(args: readonly string[]): CatalogParseResult {
     if (flag === undefined) {
       return {
         kind: 'usage-error',
-        code: knownFlagNames.has(token.slice(2)) ? 'invalid-flags' : 'unknown-flag',
+        code: knownFlagNames.has(token.slice(2) as CatalogFlag['name'])
+          ? 'invalid-flags'
+          : 'unknown-flag',
       };
     }
-    if (values.has(flag.name)) return { kind: 'usage-error', code: 'duplicate-flag' };
     if (flag.value === 'boolean') {
+      if (values.has(flag.name)) return { kind: 'usage-error', code: 'invalid-flags' };
       values.set(flag.name, true);
       continue;
     }
@@ -196,8 +192,14 @@ export function parseCatalogArgs(args: readonly string[]): CatalogParseResult {
     if (value === undefined || value.startsWith('-') || !isAbsolute(value)) {
       return { kind: 'usage-error', code: 'absolute-path-required' };
     }
+    if (values.has(flag.name)) return { kind: 'usage-error', code: 'duplicate-flag' };
     values.set(flag.name, value);
     index += 1;
+  }
+  if (command.parser.kind === 'placeholder') {
+    return positionals.length === 0
+      ? { kind: 'catalog-placeholder', command: command.name }
+      : { kind: 'usage-error', code: 'unexpected-positional' };
   }
   const source = values.get('source');
   const legacySource = values.get('legacy-source');
@@ -224,27 +226,24 @@ export function parseCatalogArgs(args: readonly string[]): CatalogParseResult {
       ? { kind: 'update', ...(typeof source === 'string' ? { source } : {}), apply }
       : { kind: 'usage-error', code: 'unexpected-positional' };
   }
-  if (command.parser.kind === 'rollback') {
-    const receiptId = positionals[0];
-    if (positionals.length !== 1) return { kind: 'usage-error', code: 'unexpected-positional' };
-    return receiptId === undefined || !/^[A-Za-z0-9_-]+$/.test(receiptId)
-      ? { kind: 'usage-error', code: 'receipt-id-invalid' }
-      : { kind: 'rollback', receiptId, apply };
-  }
-  return { kind: 'usage-error', code: 'unknown-command' };
+  const receiptId = positionals[0];
+  if (positionals.length !== 1) return { kind: 'usage-error', code: 'unexpected-positional' };
+  return receiptId === undefined || !/^[A-Za-z0-9_-]+$/.test(receiptId)
+    ? { kind: 'usage-error', code: 'receipt-id-invalid' }
+    : { kind: 'rollback', receiptId, apply };
 }
 
 export function renderCatalogHelp(commandName?: CatalogCommandName): string {
   if (commandName === undefined) {
     const lines = catalog.commands.map((command) => {
       const availability = command.available ? '' : ' (planned)';
-      return `  ${formatUsage(command)}${availability}\n    ${command.summary}`;
+      return `  ${formatUsage(command, 'help')}${availability}\n    ${command.summary}`;
     });
     return `USAGE\n  bun run mzsh -- <command> [options]\n\nCOMMANDS\n${lines.join('\n')}`;
   }
   const command = catalog.require(commandName);
   const flags = command.parser.flags.map(
-    (flag) => `  ${formatFlag(flag)}\n    ${flag.description}`
+    (flag) => `  ${formatFlagValue(flag, 'help')}\n    ${flag.description}`
   );
   const availability = command.available
     ? ''
@@ -252,7 +251,7 @@ export function renderCatalogHelp(commandName?: CatalogCommandName): string {
   return (
     [
       'USAGE',
-      `  bun run mzsh -- ${formatUsage(command)}`,
+      `  bun run mzsh -- ${formatUsage(command, 'help')}`,
       '',
       command.summary,
       '',
