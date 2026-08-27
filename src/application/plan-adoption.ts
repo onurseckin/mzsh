@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import type {
   AdoptionPlan,
@@ -277,4 +278,14 @@ export function planAdoption(
   } catch {
     return { kind: 'rejected', code: 'metadata-unavailable', path: input.home };
   }
+}
+
+export function adoptionPlanFingerprint(plan: AdoptionPlan): string {
+  const {
+    id: _id,
+    stateDirectory: _stateDirectory,
+    backupDirectory: _backupDirectory,
+    ...stable
+  } = plan;
+  return createHash('sha256').update(JSON.stringify(stable)).digest('hex');
 }

@@ -1,12 +1,15 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import { applyAdoption } from '../application/apply-adoption';
+import { ReviewedPlanApplicationService } from '../application/apply-reviewed-plan';
 import { auditEnvironment } from '../application/audit-environment';
-import { planAdoption } from '../application/plan-adoption';
+import { adoptionPlanFingerprint, planAdoption } from '../application/plan-adoption';
 import { rollbackAdoption } from '../application/rollback-adoption';
 import { classifySensitiveAssignment } from '../application/sensitive-assignment-policy';
 import type { AdoptionPlan, AdoptionApplyResult, AdoptionRollbackResult } from '../domain/adoption';
 import type { EnvironmentSnapshot } from '../domain/audit';
+import { createReviewedPlan } from '../domain/action-plan';
+import { SqliteHistory } from '../infrastructure/history-sqlite';
 import { NodeAdoptionFilesystem } from '../infrastructure/adoption-filesystem';
 import { EnvironmentProbes } from '../infrastructure/environment-probes';
 import { ZshPreflight } from '../infrastructure/zsh-preflight';
@@ -36,6 +39,7 @@ export interface RunMzshCliDependencies {
   probes?: Probes;
   preflight?: Preflight;
   id?: () => string;
+  reviewedPlanId?: () => string;
   apply?: typeof applyAdoption;
   rollback?: typeof rollbackAdoption;
 }
@@ -66,6 +70,23 @@ function planSummary(plan: AdoptionPlan): object {
     repositoryPreconditions: plan.repositoryPreconditions,
     sensitiveAssignmentCount: plan.privateMigration?.selectedLineIndexes.length ?? 0,
   };
+}
+
+function reviewedPlanId(dependencies: RunMzshCliDependencies): string {
+  return (dependencies.reviewedPlanId ?? randomUUID)();
+}
+
+function rollbackFingerprint(config: string, receiptId: string): string {
+  return createHash('sha256').update(`${config}:${receiptId}`).digest('hex');
+}
+
+function historyDirectory(dependencies: RunMzshCliDependencies): string {
+  return join(dependencies.xdgCache, 'mzsh', 'history');
+}
+
+function writePlanConfirmationRequired(dependencies: RunMzshCliDependencies): number {
+  dependencies.write('MZSH_PLAN_CONFIRMATION_REQUIRED');
+  return 1;
 }
 
 export function runMzshCli(args: readonly string[], dependencies: RunMzshCliDependencies): number {
@@ -101,21 +122,60 @@ export function runMzshCli(args: readonly string[], dependencies: RunMzshCliDepe
     return 0;
   }
   if (parsed.kind === 'rollback') {
-    const result = (dependencies.rollback ?? rollbackAdoption)(
-      {
-        receiptPath: join(
-          dependencies.xdgConfig,
-          'mzsh',
-          'state',
-          parsed.receiptId,
-          'receipt.json'
-        ),
-        dryRun: !parsed.apply,
-      },
-      { filesystem }
+    const history = new SqliteHistory(historyDirectory(dependencies));
+    const receiptPath = join(
+      dependencies.xdgConfig,
+      'mzsh',
+      'state',
+      parsed.receiptId,
+      'receipt.json'
     );
-    dependencies.write(JSON.stringify(result));
-    return isSuccess(result) ? 0 : 1;
+    const fingerprint = rollbackFingerprint(dependencies.xdgConfig, parsed.receiptId);
+    if (!parsed.apply) {
+      const result = (dependencies.rollback ?? rollbackAdoption)(
+        { receiptPath, dryRun: true },
+        { filesystem }
+      );
+      if (result.kind !== 'ready') {
+        history.close();
+        dependencies.write(JSON.stringify(result));
+        return isSuccess(result) ? 0 : 1;
+      }
+      const reviewed = createReviewedPlan({
+        id: reviewedPlanId(dependencies),
+        action: 'rollback',
+        targetNames: ['adoption-receipt'],
+        fingerprint,
+        now: new Date(),
+      });
+      history.save(reviewed);
+      history.close();
+      dependencies.write(JSON.stringify({ ...result, reviewedPlanId: reviewed.id }));
+      return 0;
+    }
+    try {
+      const applied = new ReviewedPlanApplicationService(history, history).apply({
+        planId: parsed.planId,
+        confirmation: parsed.confirmation,
+        action: 'rollback',
+        fingerprint,
+        now: new Date(),
+        snapshot: () => ({ kind: 'adoption-receipt' }),
+        execute: () =>
+          (dependencies.rollback ?? rollbackAdoption)(
+            { receiptPath, dryRun: false },
+            { filesystem }
+          ),
+      });
+      dependencies.write(JSON.stringify(applied));
+      return isSuccess(applied) ? 0 : 1;
+    } catch (error) {
+      if (error instanceof Error && error.message === 'PLAN_CONFIRMATION_REQUIRED')
+        return writePlanConfirmationRequired(dependencies);
+      throw error;
+    } finally {
+      history.close();
+    }
   }
   const repository =
     parsed.kind === 'bootstrap' ? parsed.source : (parsed.source ?? dependencies.repositoryRoot);
@@ -137,12 +197,46 @@ export function runMzshCli(args: readonly string[], dependencies: RunMzshCliDepe
     dependencies.write(`MZSH_${planned.code}`);
     return 1;
   }
-  dependencies.write(JSON.stringify(planSummary(planned.plan)));
-  if (!parsed.apply) return 0;
-  const result = (dependencies.apply ?? applyAdoption)(planned.plan, {
-    filesystem,
-    preflight: (candidate) => (dependencies.preflight ?? new ZshPreflight()).preflight(candidate),
-  });
-  dependencies.write(JSON.stringify(result));
-  return isSuccess(result) ? 0 : 1;
+  const history = new SqliteHistory(historyDirectory(dependencies));
+  const action = parsed.kind;
+  const fingerprint = adoptionPlanFingerprint(planned.plan);
+  if (!parsed.apply) {
+    const reviewed = createReviewedPlan({
+      id: reviewedPlanId(dependencies),
+      action,
+      targetNames: ['managed-loader', 'managed-private', 'managed-shims', 'managed-current'],
+      fingerprint,
+      now: new Date(),
+    });
+    history.save(reviewed);
+    history.close();
+    dependencies.write(
+      JSON.stringify({ ...planSummary(planned.plan), reviewedPlanId: reviewed.id })
+    );
+    return 0;
+  }
+  try {
+    const result = new ReviewedPlanApplicationService(history, history).apply({
+      planId: parsed.planId,
+      confirmation: parsed.confirmation,
+      action,
+      fingerprint,
+      now: new Date(),
+      snapshot: () => ({ kind: 'managed-state' }),
+      execute: () =>
+        (dependencies.apply ?? applyAdoption)(planned.plan, {
+          filesystem,
+          preflight: (candidate) =>
+            (dependencies.preflight ?? new ZshPreflight()).preflight(candidate),
+        }),
+    });
+    dependencies.write(JSON.stringify(result));
+    return isSuccess(result) ? 0 : 1;
+  } catch (error) {
+    if (error instanceof Error && error.message === 'PLAN_CONFIRMATION_REQUIRED')
+      return writePlanConfirmationRequired(dependencies);
+    throw error;
+  } finally {
+    history.close();
+  }
 }

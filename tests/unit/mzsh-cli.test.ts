@@ -58,10 +58,22 @@ describe('MZSH managed CLI', () => {
       source: '/checkout',
       apply: false,
     });
-    expect(parseArguments(['rollback', 'receipt_1', '--apply'])).toEqual({
+    expect(
+      parseArguments([
+        'rollback',
+        'receipt_1',
+        '--apply',
+        '--plan-id',
+        '4b5fd2fd-2f80-4ce9-a8f3-5c12dfacbe49',
+        '--confirm',
+        'APPLY',
+      ])
+    ).toEqual({
       kind: 'rollback',
       receiptId: 'receipt_1',
       apply: true,
+      planId: '4b5fd2fd-2f80-4ce9-a8f3-5c12dfacbe49',
+      confirmation: 'APPLY',
     });
     expect(parseArguments(['bootstrap', '--source', 'relative'])).toEqual(
       expect.objectContaining({ kind: 'usage-error' })
@@ -119,7 +131,7 @@ describe('MZSH managed CLI', () => {
     expect(isManagedCliRoute(['--uninst'])).toBe(true);
   });
 
-  test('bootstrap dry-run emits exact safe metadata and apply is the only apply invocation', () => {
+  test('bootstrap requires a reviewed plan ID and literal confirmation before apply', () => {
     const fixture = cliFixture();
     try {
       const output: string[] = [];
@@ -131,6 +143,7 @@ describe('MZSH managed CLI', () => {
         repositoryRoot: fixture.repository,
         write: (message: string) => output.push(message),
         id: () => 'cli-tx',
+        reviewedPlanId: () => '4b5fd2fd-2f80-4ce9-a8f3-5c12dfacbe49',
         apply: () => {
           applied += 1;
           return { kind: 'applied' as const, receiptPath: join(fixture.config, 'receipt') };
@@ -164,6 +177,26 @@ describe('MZSH managed CLI', () => {
           ],
           dependencies
         )
+      ).toBe(1);
+      expect(applied).toBe(0);
+      expect(output[0]).toBe('MZSH_PLAN_CONFIRMATION_REQUIRED');
+      output.splice(0);
+      expect(
+        runMzshCli(
+          [
+            'bootstrap',
+            '--source',
+            fixture.repository,
+            '--legacy-source',
+            fixture.legacy,
+            '--apply',
+            '--plan-id',
+            '4b5fd2fd-2f80-4ce9-a8f3-5c12dfacbe49',
+            '--confirm',
+            'APPLY',
+          ],
+          dependencies
+        )
       ).toBe(0);
       expect(applied).toBe(1);
     } finally {
@@ -171,7 +204,7 @@ describe('MZSH managed CLI', () => {
     }
   });
 
-  test('update uses the same local plan and rollback uses only the contained receipt path', () => {
+  test('update and rollback require reviewed plan confirmation for apply', () => {
     const fixture = cliFixture();
     try {
       let applied = 0;
@@ -183,6 +216,7 @@ describe('MZSH managed CLI', () => {
         repositoryRoot: fixture.repository,
         write: (_message: string) => undefined,
         id: () => 'update-tx',
+        reviewedPlanId: () => '4b5fd2fd-2f80-4ce9-a8f3-5c12dfacbe50',
         apply: () => {
           applied += 1;
           return { kind: 'applied' as const, receiptPath: 'receipt' };
@@ -197,11 +231,40 @@ describe('MZSH managed CLI', () => {
       expect(runMzshCli(['update', '--source', fixture.repository], dependencies)).toBe(0);
       expect(applied).toBe(0);
       expect(runMzshCli(['update', '--source', fixture.repository, '--apply'], dependencies)).toBe(
-        0
+        1
       );
+      expect(
+        runMzshCli(
+          [
+            'update',
+            '--source',
+            fixture.repository,
+            '--apply',
+            '--plan-id',
+            '4b5fd2fd-2f80-4ce9-a8f3-5c12dfacbe50',
+            '--confirm',
+            'APPLY',
+          ],
+          dependencies
+        )
+      ).toBe(0);
       expect(applied).toBe(1);
       expect(runMzshCli(['rollback', 'receipt_1'], dependencies)).toBe(0);
-      expect(runMzshCli(['rollback', 'receipt_1', '--apply'], dependencies)).toBe(0);
+      expect(runMzshCli(['rollback', 'receipt_1', '--apply'], dependencies)).toBe(1);
+      expect(
+        runMzshCli(
+          [
+            'rollback',
+            'receipt_1',
+            '--apply',
+            '--plan-id',
+            '4b5fd2fd-2f80-4ce9-a8f3-5c12dfacbe50',
+            '--confirm',
+            'APPLY',
+          ],
+          dependencies
+        )
+      ).toBe(0);
       expect(rollbackPaths).toEqual([
         `${join(fixture.config, 'mzsh', 'state', 'receipt_1', 'receipt.json')}:true`,
         `${join(fixture.config, 'mzsh', 'state', 'receipt_1', 'receipt.json')}:false`,

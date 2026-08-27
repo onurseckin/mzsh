@@ -1,4 +1,5 @@
 import { isAbsolute } from 'node:path';
+import { isReviewedPlanId } from '../domain/action-plan';
 import type {
   CatalogCommand,
   CatalogCommandName,
@@ -11,6 +12,16 @@ const applyFlag: CatalogFlag = {
   name: 'apply',
   value: 'boolean',
   description: 'Apply the reviewed transaction instead of showing its plan.',
+};
+const planIdFlag: CatalogFlag = {
+  name: 'plan-id',
+  value: 'reviewed-plan-id',
+  description: 'Use the exact reviewed plan identifier from the dry-run output.',
+};
+const confirmFlag: CatalogFlag = {
+  name: 'confirm',
+  value: 'confirmation',
+  description: 'Confirm the reviewed plan with the literal value APPLY.',
 };
 const jsonFlag: CatalogFlag = {
   name: 'json',
@@ -45,7 +56,13 @@ const commands: readonly CatalogCommand[] = [
     palette: { keywords: ['bootstrap', 'adopt'] },
     parser: {
       kind: 'bootstrap',
-      flags: [{ ...sourceFlag, required: true }, legacySourceFlag, applyFlag],
+      flags: [
+        { ...sourceFlag, required: true },
+        legacySourceFlag,
+        applyFlag,
+        planIdFlag,
+        confirmFlag,
+      ],
       positional: 'none',
     },
   },
@@ -55,7 +72,11 @@ const commands: readonly CatalogCommand[] = [
     risk: 'destructive',
     available: true,
     palette: { keywords: ['update', 'plan'] },
-    parser: { kind: 'update', flags: [sourceFlag, applyFlag], positional: 'none' },
+    parser: {
+      kind: 'update',
+      flags: [sourceFlag, applyFlag, planIdFlag, confirmFlag],
+      positional: 'none',
+    },
   },
   {
     name: 'rollback',
@@ -63,7 +84,11 @@ const commands: readonly CatalogCommand[] = [
     risk: 'destructive',
     available: true,
     palette: { keywords: ['rollback', 'receipt'] },
-    parser: { kind: 'rollback', flags: [applyFlag], positional: 'receipt-id' },
+    parser: {
+      kind: 'rollback',
+      flags: [applyFlag, planIdFlag, confirmFlag],
+      positional: 'receipt-id',
+    },
   },
   {
     name: 'setup',
@@ -136,6 +161,8 @@ function flagFor(command: CatalogCommand, name: string): CatalogFlag | undefined
 
 function formatFlagValue(flag: CatalogFlag, style: CatalogUsageStyle): string {
   if (flag.value === 'boolean') return `--${flag.name}`;
+  if (flag.value === 'reviewed-plan-id') return '--plan-id reviewed-plan-id';
+  if (flag.value === 'confirmation') return '--confirm APPLY';
   if (style === 'help') return `--${flag.name} absolute-path`;
   return flag.name === 'legacy-source'
     ? `--${flag.name} /absolute/file`
@@ -189,9 +216,12 @@ export function parseCatalogArgs(args: readonly string[]): CatalogParseResult {
       continue;
     }
     const value = args[index + 1];
-    if (value === undefined || value.startsWith('-') || !isAbsolute(value)) {
+    if (value === undefined || value.startsWith('-'))
+      return { kind: 'usage-error', code: 'invalid-flags' };
+    if (flag.value === 'absolute-path' && !isAbsolute(value))
       return { kind: 'usage-error', code: 'absolute-path-required' };
-    }
+    if (flag.value === 'reviewed-plan-id' && !isReviewedPlanId(value))
+      return { kind: 'usage-error', code: 'plan-id-invalid' };
     if (values.has(flag.name)) return { kind: 'usage-error', code: 'duplicate-flag' };
     values.set(flag.name, value);
     index += 1;
@@ -204,7 +234,16 @@ export function parseCatalogArgs(args: readonly string[]): CatalogParseResult {
   const source = values.get('source');
   const legacySource = values.get('legacy-source');
   const apply = values.has('apply');
+  const planId = values.get('plan-id');
+  const confirmation = values.get('confirm');
   const json = values.has('json');
+  if (
+    (!apply && (planId !== undefined || confirmation !== undefined)) ||
+    (typeof planId !== 'undefined' && typeof planId !== 'string') ||
+    (typeof confirmation !== 'undefined' && typeof confirmation !== 'string')
+  ) {
+    return { kind: 'usage-error', code: 'invalid-flags' };
+  }
   if (command.parser.kind === 'audit') {
     return positionals.length === 0
       ? { kind: 'audit', ...(typeof source === 'string' ? { source } : {}), json }
@@ -218,19 +257,33 @@ export function parseCatalogArgs(args: readonly string[]): CatalogParseResult {
           source,
           ...(typeof legacySource === 'string' ? { legacySource } : {}),
           apply,
+          ...(typeof planId === 'string' ? { planId } : {}),
+          ...(typeof confirmation === 'string' ? { confirmation } : {}),
         }
       : { kind: 'usage-error', code: 'source-required' };
   }
   if (command.parser.kind === 'update') {
     return positionals.length === 0
-      ? { kind: 'update', ...(typeof source === 'string' ? { source } : {}), apply }
+      ? {
+          kind: 'update',
+          ...(typeof source === 'string' ? { source } : {}),
+          apply,
+          ...(typeof planId === 'string' ? { planId } : {}),
+          ...(typeof confirmation === 'string' ? { confirmation } : {}),
+        }
       : { kind: 'usage-error', code: 'unexpected-positional' };
   }
   const receiptId = positionals[0];
   if (positionals.length !== 1) return { kind: 'usage-error', code: 'unexpected-positional' };
   return receiptId === undefined || !/^[A-Za-z0-9_-]+$/.test(receiptId)
     ? { kind: 'usage-error', code: 'receipt-id-invalid' }
-    : { kind: 'rollback', receiptId, apply };
+    : {
+        kind: 'rollback',
+        receiptId,
+        apply,
+        ...(typeof planId === 'string' ? { planId } : {}),
+        ...(typeof confirmation === 'string' ? { confirmation } : {}),
+      };
 }
 
 export function renderCatalogHelp(commandName?: CatalogCommandName): string {

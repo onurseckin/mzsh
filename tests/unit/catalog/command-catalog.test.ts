@@ -12,12 +12,24 @@ describe('command catalog', () => {
     const entry = catalog.require('rollback');
 
     expect(entry.risk).toBe('destructive');
-    expect(parseCatalogArgs(['rollback', 'r1', '--apply'])).toEqual({
+    expect(
+      parseCatalogArgs([
+        'rollback',
+        'r1',
+        '--apply',
+        '--plan-id',
+        '4b5fd2fd-2f80-4ce9-a8f3-5c12dfacbe49',
+        '--confirm',
+        'APPLY',
+      ])
+    ).toEqual({
       kind: 'rollback',
       receiptId: 'r1',
       apply: true,
+      planId: '4b5fd2fd-2f80-4ce9-a8f3-5c12dfacbe49',
+      confirmation: 'APPLY',
     });
-    expect(renderCatalogHelp('rollback')).toContain('rollback receipt-id [--apply]');
+    expect(renderCatalogHelp('rollback')).toContain('--plan-id reviewed-plan-id');
   });
 
   test('preserves managed parser safety errors from catalog flag grammar', () => {
@@ -79,10 +91,10 @@ describe('command catalog', () => {
 
   test('derives help and checkout usage from the bootstrap flag grammar', () => {
     expect(renderCatalogUsage('bootstrap', 'help')).toBe(
-      'bootstrap --source absolute-path [--legacy-source absolute-path] [--apply]'
+      'bootstrap --source absolute-path [--legacy-source absolute-path] [--apply] [--plan-id reviewed-plan-id] [--confirm APPLY]'
     );
     expect(renderCatalogUsage('bootstrap', 'checkout')).toBe(
-      'bootstrap --source /absolute/checkout [--legacy-source /absolute/file] [--apply]'
+      'bootstrap --source /absolute/checkout [--legacy-source /absolute/file] [--apply] [--plan-id reviewed-plan-id] [--confirm APPLY]'
     );
     expect(renderCatalogHelp('bootstrap')).toContain(renderCatalogUsage('bootstrap', 'help'));
   });

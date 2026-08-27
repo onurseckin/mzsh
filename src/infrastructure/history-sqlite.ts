@@ -1,0 +1,189 @@
+import { Database } from 'bun:sqlite';
+import { join } from 'node:path';
+import { isReviewedPlanId, type ReviewedPlan } from '../domain/action-plan';
+import type { DurablePlanStore, HistoryRecord, HistoryStore } from '../domain/history';
+import { OwnerOnlyFilesystem } from './owner-only-filesystem';
+
+interface PlanRow {
+  id: string;
+  action: ReviewedPlan['action'];
+  target_names: string;
+  fingerprint: string;
+  created_at: string;
+}
+
+interface HistoryRow {
+  id: string;
+  plan_id: string;
+  action: HistoryRecord['action'];
+  target_names: string;
+  result: HistoryRecord['result'];
+  snapshot_kind: HistoryRecord['snapshot']['kind'];
+  occurred_at: string;
+}
+
+export class SqliteHistory implements DurablePlanStore, HistoryStore {
+  private readonly databasePath: string;
+  private readonly database: Database;
+
+  constructor(directory: string, filesystem = new OwnerOnlyFilesystem()) {
+    filesystem.ensureDirectory(directory);
+    this.databasePath = join(directory, 'history.sqlite');
+    this.database = new Database(this.databasePath, { create: true, strict: true });
+    filesystem.ensureFile(this.databasePath);
+    this.database.run(
+      'CREATE TABLE IF NOT EXISTS reviewed_plans (id TEXT PRIMARY KEY, action TEXT NOT NULL, target_names TEXT NOT NULL, fingerprint TEXT NOT NULL, created_at TEXT NOT NULL)'
+    );
+    this.database.run(
+      'CREATE TABLE IF NOT EXISTS history (id TEXT PRIMARY KEY, plan_id TEXT NOT NULL, action TEXT NOT NULL, target_names TEXT NOT NULL, result TEXT NOT NULL, snapshot_kind TEXT NOT NULL, occurred_at TEXT NOT NULL)'
+    );
+  }
+
+  save(plan: ReviewedPlan): void {
+    if (!isReviewedPlan(plan)) throw new Error('REDACTED_PLAN_REQUIRED');
+    this.database
+      .query<never, [string, string, string, string, string]>(
+        'INSERT OR REPLACE INTO reviewed_plans (id, action, target_names, fingerprint, created_at) VALUES (?, ?, ?, ?, ?)'
+      )
+      .run(
+        plan.id,
+        plan.action,
+        JSON.stringify(plan.targetNames),
+        plan.fingerprint,
+        plan.createdAt
+      );
+  }
+
+  find(id: string): ReviewedPlan | undefined {
+    const row = this.database
+      .query<PlanRow, [string]>(
+        'SELECT id, action, target_names, fingerprint, created_at FROM reviewed_plans WHERE id = ?'
+      )
+      .get(id);
+    if (row === null) return undefined;
+    const targetNames = parseTargetNames(row.target_names);
+    if (targetNames === undefined) return undefined;
+    const plan: ReviewedPlan = {
+      schema: 'mzsh.reviewed-plan/v1',
+      id: row.id,
+      action: row.action,
+      targetNames,
+      fingerprint: row.fingerprint,
+      state: 'reviewed',
+      createdAt: row.created_at,
+    };
+    return isReviewedPlan(plan) ? plan : undefined;
+  }
+
+  record(record: HistoryRecord): void {
+    if (!isHistoryRecord(record)) throw new Error('REDACTED_HISTORY_REQUIRED');
+    this.database
+      .query<never, [string, string, string, string, string, string, string]>(
+        'INSERT INTO history (id, plan_id, action, target_names, result, snapshot_kind, occurred_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+      )
+      .run(
+        record.id,
+        record.planId,
+        record.action,
+        JSON.stringify(record.targetNames),
+        record.result,
+        record.snapshot.kind,
+        record.occurredAt
+      );
+  }
+
+  complete(planId: string, result: 'applied' | 'failed'): void {
+    this.database
+      .query<never, [string, string]>('UPDATE history SET result = ? WHERE plan_id = ?')
+      .run(result, planId);
+  }
+
+  list(limit: number): readonly HistoryRecord[] {
+    return this.database
+      .query<HistoryRow, [number]>(
+        'SELECT id, plan_id, action, target_names, result, snapshot_kind, occurred_at FROM history ORDER BY occurred_at ASC LIMIT ?'
+      )
+      .all(limit)
+      .flatMap((row) => historyRecord(row));
+  }
+
+  prune(before: Date): readonly string[] {
+    const rows = this.database
+      .query<{ id: string }, [string]>('SELECT id FROM history WHERE occurred_at < ?')
+      .all(before.toISOString());
+    this.database
+      .query<never, [string]>('DELETE FROM history WHERE occurred_at < ?')
+      .run(before.toISOString());
+    return rows.map((row) => row.id);
+  }
+
+  close(): void {
+    this.database.close();
+  }
+}
+
+function parseTargetNames(value: string): HistoryRecord['targetNames'] | undefined {
+  const parsed: unknown = JSON.parse(value);
+  if (!Array.isArray(parsed) || !parsed.every(isTargetName)) return undefined;
+  return parsed;
+}
+
+function isTargetName(value: unknown): value is HistoryRecord['targetNames'][number] {
+  return (
+    value === 'managed-loader' ||
+    value === 'managed-private' ||
+    value === 'managed-shims' ||
+    value === 'managed-current' ||
+    value === 'adoption-receipt'
+  );
+}
+
+function isReviewedPlan(plan: ReviewedPlan): boolean {
+  return (
+    plan.schema === 'mzsh.reviewed-plan/v1' &&
+    isReviewedPlanId(plan.id) &&
+    isAction(plan.action) &&
+    parseTargetNames(JSON.stringify(plan.targetNames)) !== undefined &&
+    /^[0-9a-f]{64}$/i.test(plan.fingerprint) &&
+    isIsoTimestamp(plan.createdAt) &&
+    plan.state === 'reviewed'
+  );
+}
+
+function isHistoryRecord(record: HistoryRecord): boolean {
+  return (
+    isReviewedPlanId(record.id) &&
+    isReviewedPlanId(record.planId) &&
+    isAction(record.action) &&
+    parseTargetNames(JSON.stringify(record.targetNames)) !== undefined &&
+    record.planState === 'reviewed' &&
+    (record.result === 'pending' || record.result === 'applied' || record.result === 'failed') &&
+    (record.snapshot.kind === 'managed-state' || record.snapshot.kind === 'adoption-receipt') &&
+    isIsoTimestamp(record.occurredAt)
+  );
+}
+
+function isAction(value: unknown): value is HistoryRecord['action'] {
+  return value === 'bootstrap' || value === 'update' || value === 'rollback';
+}
+
+function isIsoTimestamp(value: string): boolean {
+  const time = new Date(value);
+  return !Number.isNaN(time.getTime()) && time.toISOString() === value;
+}
+
+function historyRecord(row: HistoryRow): HistoryRecord[] {
+  const targetNames = parseTargetNames(row.target_names);
+  if (targetNames === undefined) return [];
+  const record: HistoryRecord = {
+    id: row.id,
+    planId: row.plan_id,
+    action: row.action,
+    targetNames,
+    planState: 'reviewed',
+    result: row.result,
+    snapshot: { kind: row.snapshot_kind },
+    occurredAt: row.occurred_at,
+  };
+  return isHistoryRecord(record) ? [record] : [];
+}
