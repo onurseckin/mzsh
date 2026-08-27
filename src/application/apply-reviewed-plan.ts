@@ -15,6 +15,7 @@ export interface ApplyReviewedPlanInput<Result> {
   fingerprint?: string;
   now: Date;
   snapshot(): RecoverySnapshot;
+  revalidate?(): boolean;
   execute(): Result;
 }
 
@@ -31,13 +32,22 @@ export class ReviewedPlanApplicationService {
       input.fingerprint === undefined
     )
       throw new Error('PLAN_CONFIRMATION_REQUIRED');
+    const reviewed = this.plans.find(input.planId);
+    if (
+      reviewed === undefined ||
+      reviewed.action !== input.action ||
+      reviewed.fingerprint !== input.fingerprint
+    )
+      throw new Error('PLAN_CONFIRMATION_REQUIRED');
+    const snapshot = input.snapshot();
+    if (input.revalidate !== undefined && !input.revalidate())
+      throw new Error('PLAN_CONFIRMATION_REQUIRED');
     const plan = this.plans.consume({
       id: input.planId,
       action: input.action,
       fingerprint: input.fingerprint,
     });
     if (plan === undefined) throw new Error('PLAN_CONFIRMATION_REQUIRED');
-    const snapshot = input.snapshot();
     const attemptId = randomUUID();
     this.history.record({
       id: attemptId,

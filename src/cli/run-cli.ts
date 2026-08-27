@@ -202,6 +202,11 @@ export function runMzshCli(args: readonly string[], dependencies: RunMzshCliDepe
           if (verified.kind !== 'ready') throw new Error('ROLLBACK_SNAPSHOT_UNAVAILABLE');
           return rollbackSnapshot();
         },
+        revalidate: () =>
+          (dependencies.rollbackStateDigest ?? rollbackStateDigest)(
+            { receiptPath, dryRun: true },
+            { filesystem }
+          ) === fingerprint,
         execute: () =>
           (dependencies.rollback ?? rollbackAdoption)(
             { receiptPath, dryRun: false },
