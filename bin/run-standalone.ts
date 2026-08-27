@@ -36,6 +36,16 @@ try {
   const module = await import(commandPath);
   ZshrcManager = module.default || module.ZshrcManager || module;
 
+  if (process.argv.slice(2).join(' ') === '--zsh-completion') {
+    const renderCompletion = module.renderZshCompletion;
+    if (typeof renderCompletion !== 'function') {
+      console.error('Error: MZSH completion renderer is unavailable');
+      process.exit(1);
+    }
+    console.log(renderCompletion());
+    process.exit(0);
+  }
+
   if (typeof ZshrcManager !== 'function') {
     console.error('Error: ZshrcManager is not a constructor function');
     console.error('Available exports:', Object.keys(module));

@@ -79,6 +79,10 @@ export function runMzshCli(args: readonly string[], dependencies: RunMzshCliDepe
     dependencies.write(`MZSH_USAGE_${parsed.code}`);
     return 2;
   }
+  if (parsed.kind === 'catalog-placeholder') {
+    dependencies.write('MZSH_USAGE_command-unavailable');
+    return 2;
+  }
   const filesystem = dependencies.filesystem ?? new NodeAdoptionFilesystem();
   if (parsed.kind === 'audit') {
     const repositoryRoot = parsed.source ?? dependencies.repositoryRoot;

@@ -19,7 +19,11 @@ import { InteractiveMenu } from './interactiveMenu';
 import { appMessages, formatMessage } from './messages';
 import { type OpenType, getAvailableOpenTypes, getOpenConfig, isValidOpenType } from './openConfig';
 import { runMzshCli } from './cli/run-cli';
+import { catalog } from './catalog/command-catalog';
+import { createCommanderAdapter } from './catalog/commander-adapter';
 import { resolve } from 'node:path';
+
+export { renderZshCompletion } from './catalog/completion';
 
 export function managedRepositoryRoot(moduleDirectory: string): string {
   return resolve(moduleDirectory, '..');
@@ -27,16 +31,17 @@ export function managedRepositoryRoot(moduleDirectory: string): string {
 
 export function isManagedCliRoute(args: readonly string[]): boolean {
   return (
-    ['audit', 'bootstrap', 'update', 'rollback'].includes(args[0] ?? '') ||
+    catalog.has(args[0] ?? '') ||
     args.some((arg) => ['--update', '--reinstall', '--uninst'].includes(arg))
   );
 }
 
+const implementedCatalogCommands = ['audit', 'bootstrap', 'update', 'rollback'] as const;
+
 export const checkoutLocalCommandLines = [
-  '  bun run mzsh -- audit [--source /absolute/checkout] [--json]',
-  '  bun run mzsh -- bootstrap --source /absolute/checkout [--apply]',
-  '  bun run mzsh -- update [--source /absolute/checkout] [--apply]',
-  '  bun run mzsh -- rollback receipt-id [--apply]',
+  ...implementedCatalogCommands.map(
+    (name) => `  bun run mzsh -- ${catalog.require(name).checkoutUsage}`
+  ),
   '  bun run mzsh -- audit --json',
   '  bun run mzsh -- bootstrap --source /absolute/mzsh-checkout',
 ] as const;
@@ -200,10 +205,7 @@ export default class ZshrcManager extends Command {
    * - Practical examples for common use cases
    */
   private showHelp(): void {
-    console.log(appMessages.help.description);
-    console.log('');
-    console.log('USAGE');
-    for (const line of checkoutLocalCommandLines.slice(0, 4)) console.log(line);
+    console.log(createCommanderAdapter().help());
     console.log('');
     console.log('OPTIONS');
     console.log(`  ${appMessages.help.options.openType}`);
