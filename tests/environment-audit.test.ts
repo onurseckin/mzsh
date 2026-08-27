@@ -200,7 +200,7 @@ describe('environment audit', () => {
         portableEntrypoint: '/isolated/repository/portable/zsh/init.zsh',
       }),
       inspectCommand: (name) => ({ name, status: 'absent' }),
-      inspectPnpmGlobalBinDirectory: () => ({ status: 'absent' }),
+      inspectPnpmRuntimeDirectory: () => ({ status: 'absent' }),
       inspectJavaHomeDiscovery: () => 'not-discovered',
       inspectHomebrewNode: () => 'absent',
     };
@@ -256,7 +256,7 @@ describe('environment audit', () => {
         name === 'java'
           ? { name, status: 'absent' }
           : { name, status: 'present', executablePath: `/isolated/bin/${name}`, version: 'v1.0.0' },
-      inspectPnpmGlobalBinDirectory: () => ({
+      inspectPnpmRuntimeDirectory: () => ({
         status: 'present',
         directory: '/isolated/home/Library/pnpm/bin',
       }),
@@ -329,7 +329,7 @@ describe('environment audit', () => {
         name === 'pnpm'
           ? { name, status: 'present', executablePath: '/isolated/bin/pnpm', version: 'v11.0.0' }
           : { name, status: 'absent' },
-      inspectPnpmGlobalBinDirectory: () => ({ status: 'failed' }),
+      inspectPnpmRuntimeDirectory: () => ({ status: 'failed' }),
       inspectJavaHomeDiscovery: () => 'not-discovered',
       inspectHomebrewNode: () => 'absent',
     };
@@ -342,6 +342,37 @@ describe('environment audit', () => {
       expect.arrayContaining(['PNPM_GLOBAL_BIN_UNDISCOVERABLE', 'PROBE_FAILED'])
     );
     expect(JSON.stringify(report)).toContain('pnpm-global-bin');
+  });
+
+  test('discovers pnpm through the safe managed runtime entry without its retired command', () => {
+    const runtimeRoot = '/isolated/home/.config/mzsh/runtime-paths';
+    const report = new EnvironmentProbes({
+      environment: { HOME: '/isolated/home', PATH: `${runtimeRoot}/pnpm` },
+      platform: 'darwin',
+      currentUserId: 501,
+      inspectPath: (path) =>
+        path === runtimeRoot
+          ? { kind: 'directory', mode: 0o700, ownerId: 501 }
+          : path === `${runtimeRoot}/pnpm`
+            ? { kind: 'symlink', mode: 0o777, ownerId: 501 }
+            : undefined,
+      readText: () => undefined,
+      inspectLink: () => 'valid',
+      inspectRepository: (root) => ({
+        kind: 'present',
+        root,
+        packageName: 'mzsh',
+        portableEntrypoint: '/isolated/portable/init.zsh',
+      }),
+      inspectCommand: (name) =>
+        name === 'pnpm' ? { name, status: 'present' } : { name, status: 'absent' },
+      inspectPnpmRuntimeDirectory: () => ({ status: 'present', directory: `${runtimeRoot}/pnpm` }),
+      inspectJavaHomeDiscovery: () => 'not-discovered',
+      inspectHomebrewNode: () => 'absent',
+    }).collect({ repositoryRoot: '/isolated/repository' });
+
+    expect(report.pnpm.globalBinDiscoverable).toBe(true);
+    expect(report.probeFailures).not.toContain('pnpm-global-bin');
   });
 
   test('redacts injected repository errors at the report boundary', () => {

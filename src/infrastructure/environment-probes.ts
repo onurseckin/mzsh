@@ -11,6 +11,10 @@ import type {
 } from '../domain/audit';
 import type { RepositoryState } from '../domain/repository-state';
 import { LocalRepository } from './local-repository';
+import {
+  inspectPnpmRuntimeDirectory,
+  type PnpmGlobalBinProbeResult,
+} from './pnpm-runtime-path-probe';
 
 type PathKind = 'file' | 'directory' | 'symlink' | 'other';
 
@@ -29,16 +33,16 @@ export interface EnvironmentProbeDependencies {
   inspectLink(path: string): 'valid' | 'absent' | 'broken';
   inspectRepository(root: string): RepositoryState;
   inspectCommand(name: 'node' | 'pnpm' | 'java'): CommandMetadata;
-  inspectPnpmGlobalBinDirectory(): PnpmGlobalBinProbeResult;
+  inspectPnpmRuntimeDirectory(
+    xdgConfig: string,
+    currentUserId: number | undefined
+  ): PnpmGlobalBinProbeResult;
   inspectJavaHomeDiscovery(): JavaHomeProbeResult;
   inspectHomebrewNode(): PresenceProbeResult;
 }
 
 export type PresenceProbeResult = 'present' | 'absent' | 'failed';
 export type JavaHomeProbeResult = 'discovered' | 'not-discovered' | 'failed';
-export type PnpmGlobalBinProbeResult =
-  | { status: 'present'; directory: string }
-  | { status: 'absent' | 'failed' };
 
 export interface EnvironmentProbeOptions {
   home?: string;
@@ -120,23 +124,6 @@ function inspectCommand(name: 'node' | 'pnpm' | 'java'): CommandMetadata {
   return commandMetadataFromVersionResult(name, executablePath, result.status, output);
 }
 
-function inspectPnpmGlobalBinDirectory(): PnpmGlobalBinProbeResult {
-  const executablePath = Bun.which('pnpm');
-  if (executablePath === null) return { status: 'absent' };
-
-  const result = spawnSync(executablePath, ['bin', '--global'], {
-    encoding: 'utf8',
-    shell: false,
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
-  if (result.status !== 0 || typeof result.stdout !== 'string') return { status: 'failed' };
-
-  const directory = result.stdout.trim();
-  return directory.length > 0 && !directory.includes('\n') && isAbsolute(directory)
-    ? { status: 'present', directory }
-    : { status: 'failed' };
-}
-
 function inspectJavaHomeDiscovery(): JavaHomeProbeResult {
   const result = spawnSync('/usr/libexec/java_home', [], {
     encoding: 'utf8',
@@ -179,7 +166,7 @@ function defaultDependencies(): EnvironmentProbeDependencies {
     inspectLink,
     inspectRepository: (root) => new LocalRepository().inspect(root),
     inspectCommand,
-    inspectPnpmGlobalBinDirectory,
+    inspectPnpmRuntimeDirectory,
     inspectJavaHomeDiscovery,
     inspectHomebrewNode,
   };
@@ -261,7 +248,7 @@ export class EnvironmentProbes {
     };
     const pnpmGlobalBin =
       pnpm.status === 'present'
-        ? this.safePnpmGlobalBinDirectory(failures)
+        ? this.safePnpmRuntimeDirectory(xdgConfig, failures)
         : { status: 'absent' as const };
     const javaHome =
       this.dependencies.platform === 'darwin'
@@ -349,9 +336,15 @@ export class EnvironmentProbes {
     }
   }
 
-  private safePnpmGlobalBinDirectory(failures: AuditProbeName[]): PnpmGlobalBinProbeResult {
+  private safePnpmRuntimeDirectory(
+    xdgConfig: string,
+    failures: AuditProbeName[]
+  ): PnpmGlobalBinProbeResult {
     try {
-      const result = this.dependencies.inspectPnpmGlobalBinDirectory();
+      const result = this.dependencies.inspectPnpmRuntimeDirectory(
+        xdgConfig,
+        this.dependencies.currentUserId
+      );
       if (result.status === 'failed') failures.push('pnpm-global-bin');
       return result;
     } catch {
