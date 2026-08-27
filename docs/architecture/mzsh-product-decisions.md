@@ -50,11 +50,24 @@ commands, artifacts, or services exist.
 - Compiled distribution artifacts are a later delivery concern. They may make
   global installation simpler, but they do not replace Bun and TypeScript as
   the system of record or create a second implementation path.
-- OpenTUI is the approved full-screen terminal foundation. It is isolated behind
-  a renderer adapter, exact dependency pin, and explicit supported-target
-  matrix. The [OpenTUI project](https://github.com/anomalyco/opentui) publishes
-  its core, React, and Solid packages, which keeps the adapter decision
-  separate from the terminal foundation decision.
+- React and `@opentui/react` are the approved full-screen UI foundation.
+  React's component model is the chosen readability boundary for this product;
+  Solid and Ink are not selected.
+- Ink documents a Node-process runtime model and does not provide the adopted
+  first-party leader/sequence dispatcher required by MZSH. OpenTUI is Bun-aligned
+  and publishes `@opentui/react` with `@opentui/core` and `@opentui/keymap`; the
+  latter is its shared command, keybinding, and sequence engine. See the
+  [Ink project](https://github.com/vadimdemedes/ink) and the
+  [OpenTUI project](https://github.com/anomalyco/opentui).
+- `@opentui/core`, `@opentui/react`, and `@opentui/keymap` must use one exact
+  coordinated version pin. A typed UI adapter isolates those dependencies from
+  the domain, transaction, inventory, history, and redaction boundaries.
+- The user interface is additive: it renders approved plans and results through
+  existing safety contracts and must not create a second mutation or sensitive
+  data path.
+- Each coordinated package release must pass smoke gates for every supported
+  release target before it becomes a baseline. The target matrix and exact pin
+  remain release evidence, not a claim about universal terminal behavior.
 
 ## Accepted product decisions
 
@@ -172,10 +185,9 @@ commands, artifacts, or services exist.
 These decisions are intentionally unresolved. They must be selected through a
 reviewed architecture decision before implementation depends on them.
 
-1. UI renderer adapter and command framework: verify whether `@opentui/react`,
-   Solid, or the core API best fits the renderer adapter, and choose the command
-   framework without duplicating the shared parser/router. Commander and Citty
-   are not approved by this checkpoint.
+1. Command framework: choose the framework, if any, that serves the shared
+   parser/router without duplicating command behavior. Commander and Citty are
+   not approved by this checkpoint.
 2. Global release artifact: define the exact GitHub-distributed artifact,
    provenance verification, install location, version discovery, clean
    fast-forward update rules, and recovery when the local installation changes.
@@ -228,8 +240,7 @@ the following:
 
 This checkpoint contains no credential material, personal paths, placeholder
 tasks, or unapproved installation syntax. The future lifecycle name is an
-accepted product decision; the global artifact, UI renderer adapter, and command
-framework remain explicitly unresolved. It uses no fenced commands. Its links
-are relative architecture navigation or primary upstream project references.
-The document is a durable decision record and remains below the repository line
-limit.
+accepted product decision; the global artifact and command framework remain
+explicitly unresolved. It uses no fenced commands. Its links are relative
+architecture navigation or primary upstream project references. The document is
+a durable decision record and remains below the repository line limit.
