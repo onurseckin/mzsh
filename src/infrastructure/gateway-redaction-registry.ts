@@ -112,6 +112,11 @@ const extraction = Object.freeze([
     ruleId: 'bearer-token-keyword-anchored',
   },
   {
+    prefix: 'OAUTH_',
+    sourcePath: 'src/services/redaction/rules/keyword-secret.ts',
+    ruleId: 'bearer-token-keyword-anchored',
+  },
+  {
     prefix: 'JWT_',
     sourcePath: 'src/services/redaction/rules/keyword-secret.ts',
     ruleId: 'extended-keyword-anchored-secret',

@@ -20,4 +20,36 @@ describe('redaction service', () => {
     expect(JSON.stringify(gatewayRedactionRegistry)).not.toContain('private');
     expect(record.value).toBe('[REDACTED]');
   });
+
+  test('keeps the pinned bearer-token prefix evidence exact', () => {
+    const bearerPrefixes = ['ACCESS_', 'BEARER_', 'ID_', 'OAUTH_'];
+
+    expect(
+      gatewayRedactionRegistry.provenance.extraction.filter(
+        (entry) =>
+          bearerPrefixes.includes(entry.prefix) && entry.ruleId === 'bearer-token-keyword-anchored'
+      )
+    ).toEqual([
+      {
+        prefix: 'ACCESS_',
+        sourcePath: 'src/services/redaction/rules/keyword-secret.ts',
+        ruleId: 'bearer-token-keyword-anchored',
+      },
+      {
+        prefix: 'BEARER_',
+        sourcePath: 'src/services/redaction/rules/keyword-secret.ts',
+        ruleId: 'bearer-token-keyword-anchored',
+      },
+      {
+        prefix: 'ID_',
+        sourcePath: 'src/services/redaction/rules/keyword-secret.ts',
+        ruleId: 'bearer-token-keyword-anchored',
+      },
+      {
+        prefix: 'OAUTH_',
+        sourcePath: 'src/services/redaction/rules/keyword-secret.ts',
+        ruleId: 'bearer-token-keyword-anchored',
+      },
+    ]);
+  });
 });
