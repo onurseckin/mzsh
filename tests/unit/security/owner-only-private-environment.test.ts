@@ -82,4 +82,20 @@ describe('owner-only private environment', () => {
     );
     expect(opened).toBe(0);
   });
+
+  test('refuses a post-validation pre-launch swap when no safe editor handoff exists', () => {
+    let opened = 0;
+    const boundary = new OwnerOnlyPrivateEnvironment(
+      '/safe/private.zsh',
+      () => {
+        opened += 1;
+      },
+      new BoundaryFilesystem(true, snapshot)
+    );
+
+    expect(() => boundary.requestSet('SERVICE_TOKEN')).toThrow(
+      'PRIVATE_ENVIRONMENT_SECURE_HANDOFF_REQUIRED'
+    );
+    expect(opened).toBe(0);
+  });
 });

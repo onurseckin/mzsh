@@ -7,6 +7,11 @@ const extraction = Object.freeze([
     ruleId: 'keyword-anchored-secret',
   },
   {
+    prefix: 'ACCESS_',
+    sourcePath: 'src/services/redaction/rules/keyword-secret.ts',
+    ruleId: 'bearer-token-keyword-anchored',
+  },
+  {
     prefix: 'API_',
     sourcePath: 'src/services/redaction/rules/keyword-secret.ts',
     ruleId: 'keyword-anchored-secret',
@@ -32,9 +37,29 @@ const extraction = Object.freeze([
     ruleId: 'azure-ad-client-secret-context',
   },
   {
+    prefix: 'BEARER_',
+    sourcePath: 'src/services/redaction/rules/keyword-secret.ts',
+    ruleId: 'bearer-token-keyword-anchored',
+  },
+  {
+    prefix: 'CERTIFICATE_',
+    sourcePath: 'src/services/redaction/rules/keyword-secret.ts',
+    ruleId: 'long-base64-after-keyword',
+  },
+  {
+    prefix: 'CERT_',
+    sourcePath: 'src/services/redaction/rules/keyword-secret.ts',
+    ruleId: 'long-base64-after-keyword',
+  },
+  {
     prefix: 'CF_',
     sourcePath: 'src/services/redaction/rules/cloud-providers.ts',
     ruleId: 'cloudflare-api-token',
+  },
+  {
+    prefix: 'CLIENT_',
+    sourcePath: 'src/services/redaction/rules/keyword-secret.ts',
+    ruleId: 'keyword-anchored-secret',
   },
   {
     prefix: 'CLOUDFLARE_',
@@ -45,11 +70,6 @@ const extraction = Object.freeze([
     prefix: 'CLOUDFLARE_',
     sourcePath: 'src/services/redaction/rules/cloud-providers.ts',
     ruleId: 'cloudflare-global-api-key',
-  },
-  {
-    prefix: 'CLIENT_',
-    sourcePath: 'src/services/redaction/rules/keyword-secret.ts',
-    ruleId: 'keyword-anchored-secret',
   },
   {
     prefix: 'CREDENTIAL_',
@@ -82,6 +102,16 @@ const extraction = Object.freeze([
     ruleId: 'env-var-secret-suffix',
   },
   {
+    prefix: 'HMAC_',
+    sourcePath: 'src/services/redaction/rules/keyword-secret.ts',
+    ruleId: 'long-base64-after-keyword',
+  },
+  {
+    prefix: 'ID_',
+    sourcePath: 'src/services/redaction/rules/keyword-secret.ts',
+    ruleId: 'bearer-token-keyword-anchored',
+  },
+  {
     prefix: 'JWT_',
     sourcePath: 'src/services/redaction/rules/keyword-secret.ts',
     ruleId: 'extended-keyword-anchored-secret',
@@ -97,6 +127,11 @@ const extraction = Object.freeze([
     ruleId: 'extended-keyword-anchored-secret',
   },
   {
+    prefix: 'SALT_',
+    sourcePath: 'src/services/redaction/rules/keyword-secret.ts',
+    ruleId: 'long-base64-after-keyword',
+  },
+  {
     prefix: 'SECRET_',
     sourcePath: 'src/services/redaction/rules/keyword-secret.ts',
     ruleId: 'keyword-anchored-secret',
@@ -105,6 +140,11 @@ const extraction = Object.freeze([
     prefix: 'SERVICE_',
     sourcePath: 'src/services/redaction/rules/keyword-secret.ts',
     ruleId: 'extended-keyword-anchored-secret',
+  },
+  {
+    prefix: 'SIGNATURE_',
+    sourcePath: 'src/services/redaction/rules/keyword-secret.ts',
+    ruleId: 'long-base64-after-keyword',
   },
   {
     prefix: 'TOKEN_',
@@ -125,6 +165,7 @@ export const gatewayRedactionRegistry: RedactionRegistry = Object.freeze({
       'extended-keyword-anchored-secret',
       'env-var-secret-suffix',
       'long-base64-after-keyword',
+      'bearer-token-keyword-anchored',
       'aws-secret-context',
       'aws-session-token-context',
       'azure-ad-client-secret-context',

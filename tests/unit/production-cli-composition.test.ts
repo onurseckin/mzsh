@@ -41,9 +41,9 @@ test('composes names-only environment and owner-only auth services for managed C
   expect(runMzshCli(['env', 'list', '--json'], dependencies)).toBe(0);
   expect(output[0]).toBe('[{"name":"SERVICE_TOKEN","value":"[REDACTED]"}]');
   output.splice(0);
-  expect(runMzshCli(['env', 'set', 'SERVICE_TOKEN'], dependencies)).toBe(0);
-  expect(opened).toEqual([paths.privateFile]);
-  expect(output[0]).toBe('SERVICE_TOKEN [REDACTED]');
+  expect(runMzshCli(['env', 'set', 'SERVICE_TOKEN'], dependencies)).toBe(1);
+  expect(opened).toEqual([]);
+  expect(output[0]).toBe('MZSH_ENVIRONMENT_PRIVATE_BOUNDARY_REQUIRED');
 });
 
 test('fails closed when the production private boundary is unavailable', () => {

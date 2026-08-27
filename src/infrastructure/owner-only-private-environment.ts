@@ -25,7 +25,7 @@ export class OwnerOnlyPrivateEnvironment implements InteractivePrivateEnvironmen
 
   requestSet(_name: string): void {
     this.readSafeText();
-    this.open(this.path);
+    throw new Error('PRIVATE_ENVIRONMENT_SECURE_HANDOFF_REQUIRED');
   }
 
   private readSafeText(): string {
