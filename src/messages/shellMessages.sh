@@ -18,7 +18,7 @@ managed_lifecycle_notice() {
             printf '%s\n' 'Then: bun run mzsh -- rollback receipt-id'
             ;;
     esac
-    printf '%s\n' 'Add --apply only after reviewing the dry-run plan.'
+    printf '%s\n' 'Capture reviewedPlanId from dry output, then use --apply --plan-id reviewed-plan-id --confirm APPLY.'
 }
 
 install_info_starting() {

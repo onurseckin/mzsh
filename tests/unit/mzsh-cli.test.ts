@@ -267,6 +267,7 @@ describe('MZSH managed CLI', () => {
       ).toBe(0);
       expect(rollbackPaths).toEqual([
         `${join(fixture.config, 'mzsh', 'state', 'receipt_1', 'receipt.json')}:true`,
+        `${join(fixture.config, 'mzsh', 'state', 'receipt_1', 'receipt.json')}:true`,
         `${join(fixture.config, 'mzsh', 'state', 'receipt_1', 'receipt.json')}:false`,
       ]);
       expect(runMzshCli(['rollback', '../escape'], dependencies)).toBe(2);

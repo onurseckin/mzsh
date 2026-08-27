@@ -3,7 +3,7 @@ export const updateMessages = {
     updateFailed: {
       message: 'Managed local update was not applied',
       action:
-        'Inspect the local checkout and retry only after review:\n  • bun run mzsh -- audit\n  • bun run mzsh -- update --source /absolute/mzsh-checkout\n  • add --apply only for an accepted plan',
+        'Inspect the local checkout and retry only after review:\n  • bun run mzsh -- audit\n  • bun run mzsh -- update --source /absolute/mzsh-checkout\n  • capture reviewedPlanId, then add --apply --plan-id reviewed-plan-id --confirm APPLY',
       code: 'UPDATE_001',
     },
     bootstrapFailed: {
@@ -26,6 +26,6 @@ export const updateMessages = {
   info: {
     starting: 'Planning a local managed update...',
     bootstrapping: 'Planning managed bootstrap.',
-    applying: 'Applying an accepted local update plan...',
+    applying: 'Applying the captured reviewed update plan...',
   },
 } as const;

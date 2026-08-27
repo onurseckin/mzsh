@@ -20,7 +20,7 @@ export const installMessages = {
     bootstrapFailed: {
       message: 'Managed bootstrap was not applied',
       action:
-        'Review the dry-run plan, resolve its finding, then opt in:\n  • bun run mzsh -- audit\n  • bun run mzsh -- bootstrap --source /absolute/mzsh-checkout\n  • bun run mzsh -- bootstrap --source /absolute/mzsh-checkout --apply',
+        'Review the dry-run plan, capture reviewedPlanId, then opt in:\n  • bun run mzsh -- audit\n  • bun run mzsh -- bootstrap --source /absolute/mzsh-checkout\n  • bun run mzsh -- bootstrap --source /absolute/mzsh-checkout --apply --plan-id reviewed-plan-id --confirm APPLY',
       code: 'INSTALL_004',
     },
     managedStateUnavailable: {
@@ -35,7 +35,8 @@ export const installMessages = {
     pathConfigured: 'Managed PATH policy is recorded in the portable manifest.',
   },
   info: {
-    starting: 'Start with bun run mzsh -- audit; bootstrap remains a dry run until --apply.',
+    starting:
+      'Start with bun run mzsh -- audit; capture reviewedPlanId from the dry run before exact apply confirmation.',
     usageExamples: 'Checkout-local usage:',
     packageScripts: 'Managed lifecycle commands:',
     availableTypes: 'Available opening types: default, vim, nano, code, subl',

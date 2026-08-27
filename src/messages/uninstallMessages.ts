@@ -3,7 +3,7 @@ export const uninstallMessages = {
     stillFound: {
       message: 'Legacy global uninstall is retired',
       action:
-        'Recover only through a recorded transaction:\n  • bun run mzsh -- rollback receipt-id\n  • bun run mzsh -- rollback receipt-id --apply\n  • retain protected backups until the receipt is unavailable',
+        'Recover only through a recorded transaction:\n  • bun run mzsh -- rollback receipt-id\n  • capture reviewedPlanId from dry output\n  • bun run mzsh -- rollback receipt-id --apply --plan-id reviewed-plan-id --confirm APPLY\n  • retain protected backups until the receipt is unavailable',
       code: 'UNINSTALL_001',
     },
     receiptUnavailable: {

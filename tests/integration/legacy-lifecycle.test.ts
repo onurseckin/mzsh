@@ -59,7 +59,7 @@ test('retires the package update script without chaining global lifecycle comman
 
   expect(result.exitCode).toBe(2);
   expect(text(result.stdout)).toContain(
-    'bun run mzsh -- update --source /absolute/mzsh-checkout [--apply]'
+    'bun run mzsh -- update --source /absolute/mzsh-checkout --apply --plan-id reviewed-plan-id --confirm APPLY'
   );
 });
 
@@ -80,15 +80,15 @@ test('keeps every shell compatibility notice checkout-local', () => {
     'MZSH legacy installation is retired.',
     'Run: bun run mzsh -- audit',
     'Then: bun run mzsh -- bootstrap --source /absolute/mzsh-checkout',
-    'Add --apply only after reviewing the dry-run plan.',
+    'Capture reviewedPlanId from dry output, then use --apply --plan-id reviewed-plan-id --confirm APPLY.',
     'MZSH legacy update is retired.',
     'Run: bun run mzsh -- audit',
     'Then: bun run mzsh -- update --source /absolute/mzsh-checkout',
-    'Add --apply only after reviewing the dry-run plan.',
+    'Capture reviewedPlanId from dry output, then use --apply --plan-id reviewed-plan-id --confirm APPLY.',
     'MZSH legacy uninstallation is retired.',
     'Run: bun run mzsh -- audit',
     'Then: bun run mzsh -- rollback receipt-id',
-    'Add --apply only after reviewing the dry-run plan.',
+    'Capture reviewedPlanId from dry output, then use --apply --plan-id reviewed-plan-id --confirm APPLY.',
   ]);
   expect(text(result.stderr)).toBe('');
 });

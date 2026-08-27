@@ -19,6 +19,15 @@ function plan() {
   });
 }
 
+function snapshot(): RecoverySnapshot {
+  return {
+    kind: 'managed-state',
+    id: '7f0b4527-2590-4c25-864d-57d484979f11',
+    capturedAt: now.toISOString(),
+    targets: [{ name: 'managed-loader', state: 'file' }],
+  };
+}
+
 class RecordingHistory implements ReviewedPlanHistory {
   readonly events: string[] = [];
   readonly records: HistoryRecord[] = [];
@@ -60,7 +69,7 @@ describe('reviewed plan application', () => {
     const history = new RecordingHistory();
     const service = new ReviewedPlanApplicationService(store, history);
     const events: string[] = [];
-    const snapshot: RecoverySnapshot = { kind: 'managed-state' };
+    const recoverySnapshot = snapshot();
 
     const result = service.apply({
       planId: reviewed.id,
@@ -70,7 +79,7 @@ describe('reviewed plan application', () => {
       now,
       snapshot: () => {
         events.push('snapshot');
-        return snapshot;
+        return recoverySnapshot;
       },
       execute: () => {
         events.push('mutation');
@@ -85,7 +94,30 @@ describe('reviewed plan application', () => {
       planId: reviewed.id,
       action: 'bootstrap',
       result: 'pending',
-      snapshot,
+      snapshot: recoverySnapshot,
     });
+    expect(store.find(reviewed.id)).toBeUndefined();
+  });
+
+  test('does not execute an absent reviewed plan', () => {
+    const store = new InMemoryPlanStore();
+    const history = new RecordingHistory();
+    const service = new ReviewedPlanApplicationService(store, history);
+    let executed = false;
+
+    expect(() =>
+      service.apply({
+        confirmation: 'APPLY',
+        action: 'bootstrap',
+        fingerprint: 'a'.repeat(64),
+        now,
+        snapshot,
+        execute: () => {
+          executed = true;
+        },
+      })
+    ).toThrow('PLAN_CONFIRMATION_REQUIRED');
+    expect(executed).toBe(false);
+    expect(history.records).toEqual([]);
   });
 });

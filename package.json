@@ -17,7 +17,7 @@
     "uninst": "./uninstall.sh",
     "start": "bun run bin/run.ts",
     "mzsh": "bun run bin/run-standalone.ts",
-    "update": "printf '%s\\n' 'MZSH legacy update is retired. Run: bun run mzsh -- update --source /absolute/mzsh-checkout [--apply]' && exit 2",
+    "update": "printf '%s\\n' 'MZSH legacy update is retired. Run a dry plan, capture reviewedPlanId, then use: bun run mzsh -- update --source /absolute/mzsh-checkout --apply --plan-id reviewed-plan-id --confirm APPLY' && exit 2",
     "lint": "oxlint --type-aware --max-warnings 0 .",
     "lint:fix": "oxlint --type-aware --fix .",
     "format": "oxfmt",

@@ -9,6 +9,7 @@ import { classifySensitiveAssignment } from '../application/sensitive-assignment
 import type { AdoptionPlan, AdoptionApplyResult, AdoptionRollbackResult } from '../domain/adoption';
 import type { EnvironmentSnapshot } from '../domain/audit';
 import { createReviewedPlan } from '../domain/action-plan';
+import { createRecoverySnapshot } from '../domain/history';
 import { SqliteHistory } from '../infrastructure/history-sqlite';
 import { NodeAdoptionFilesystem } from '../infrastructure/adoption-filesystem';
 import { EnvironmentProbes } from '../infrastructure/environment-probes';
@@ -89,6 +90,34 @@ function writePlanConfirmationRequired(dependencies: RunMzshCliDependencies): nu
   return 1;
 }
 
+function adoptionSnapshot(plan: AdoptionPlan): ReturnType<typeof createRecoverySnapshot> {
+  return createRecoverySnapshot({
+    id: randomUUID(),
+    kind: 'managed-state',
+    capturedAt: new Date(),
+    targets: plan.targets.map((target) => ({
+      name:
+        target.category === 'loader'
+          ? 'managed-loader'
+          : target.category === 'private' || target.category === 'legacy'
+            ? 'managed-private'
+            : target.category === 'shims'
+              ? 'managed-shims'
+              : 'managed-current',
+      state: target.before.kind,
+    })),
+  });
+}
+
+function rollbackSnapshot(): ReturnType<typeof createRecoverySnapshot> {
+  return createRecoverySnapshot({
+    id: randomUUID(),
+    kind: 'adoption-receipt',
+    capturedAt: new Date(),
+    targets: [{ name: 'adoption-receipt', state: 'file' }],
+  });
+}
+
 export function runMzshCli(args: readonly string[], dependencies: RunMzshCliDependencies): number {
   const parsed = parseArguments(args);
   if (parsed.kind === 'unmanaged') return 2;
@@ -160,7 +189,14 @@ export function runMzshCli(args: readonly string[], dependencies: RunMzshCliDepe
         action: 'rollback',
         fingerprint,
         now: new Date(),
-        snapshot: () => ({ kind: 'adoption-receipt' }),
+        snapshot: () => {
+          const verified = (dependencies.rollback ?? rollbackAdoption)(
+            { receiptPath, dryRun: true },
+            { filesystem }
+          );
+          if (verified.kind !== 'ready') throw new Error('ROLLBACK_SNAPSHOT_UNAVAILABLE');
+          return rollbackSnapshot();
+        },
         execute: () =>
           (dependencies.rollback ?? rollbackAdoption)(
             { receiptPath, dryRun: false },
@@ -222,7 +258,7 @@ export function runMzshCli(args: readonly string[], dependencies: RunMzshCliDepe
       action,
       fingerprint,
       now: new Date(),
-      snapshot: () => ({ kind: 'managed-state' }),
+      snapshot: () => adoptionSnapshot(planned.plan),
       execute: () =>
         (dependencies.apply ?? applyAdoption)(planned.plan, {
           filesystem,

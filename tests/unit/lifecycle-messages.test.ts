@@ -9,36 +9,45 @@ test('guides legacy lifecycle callers through the managed reversible workflow', 
   expect(appMessages.errors.noConfigFiles.action).toContain('bun run mzsh -- audit');
   expect(appMessages.help.usage).toBe('bun run mzsh -- <command> [OPTIONS]');
   expect(appMessages.help.options.update).toBe(
-    'bun run mzsh -- update [--source /absolute/checkout] [--apply]  Plan or apply a local managed update.'
+    'bun run mzsh -- update [--source /absolute/checkout] [--apply] [--plan-id reviewed-plan-id] [--confirm APPLY]  Plan or apply a local managed update.'
   );
   expect(appMessages.help.options.bootstrap).toBe(
-    'bun run mzsh -- bootstrap --source /absolute/checkout [--legacy-source /absolute/file] [--apply]  Plan or apply initial managed-shell adoption.'
+    'bun run mzsh -- bootstrap --source /absolute/checkout [--legacy-source /absolute/file] [--apply] [--plan-id reviewed-plan-id] [--confirm APPLY]  Plan or apply initial managed-shell adoption.'
   );
   expect(appMessages.help.options.rollback).toBe(
-    'bun run mzsh -- rollback receipt-id [--apply]  Restore one recorded adoption transaction.'
+    'bun run mzsh -- rollback receipt-id [--apply] [--plan-id reviewed-plan-id] [--confirm APPLY]  Restore one recorded adoption transaction.'
   );
   expect(appMessages.help.examples).toEqual([
     'bun run mzsh -- audit [--source /absolute/checkout] [--json]',
-    'bun run mzsh -- bootstrap --source /absolute/checkout [--legacy-source /absolute/file] [--apply]',
-    'bun run mzsh -- update [--source /absolute/checkout] [--apply]',
-    'bun run mzsh -- rollback receipt-id [--apply]',
+    'bun run mzsh -- bootstrap --source /absolute/checkout [--legacy-source /absolute/file] [--apply] [--plan-id reviewed-plan-id] [--confirm APPLY]',
+    'bun run mzsh -- update [--source /absolute/checkout] [--apply] [--plan-id reviewed-plan-id] [--confirm APPLY]',
+    'bun run mzsh -- rollback receipt-id [--apply] [--plan-id reviewed-plan-id] [--confirm APPLY]',
   ]);
   expect(installMessages.info.starting).toContain('bun run mzsh -- audit');
+  expect(installMessages.errors.bootstrapFailed.action).toContain(
+    '--apply --plan-id reviewed-plan-id --confirm APPLY'
+  );
   expect(updateMessages.errors.updateFailed.action).toContain('bun run mzsh -- update');
+  expect(updateMessages.errors.updateFailed.action).toContain(
+    '--apply --plan-id reviewed-plan-id --confirm APPLY'
+  );
   expect(uninstallMessages.errors.stillFound.action).toContain(
     'bun run mzsh -- rollback receipt-id'
   );
+  expect(uninstallMessages.errors.stillFound.action).toContain(
+    '--apply --plan-id reviewed-plan-id --confirm APPLY'
+  );
   expect(ZshrcManager.examples).toEqual([
     'bun run mzsh -- audit [--source /absolute/checkout] [--json]',
-    'bun run mzsh -- bootstrap --source /absolute/checkout [--legacy-source /absolute/file] [--apply]',
-    'bun run mzsh -- update [--source /absolute/checkout] [--apply]',
-    'bun run mzsh -- rollback receipt-id [--apply]',
+    'bun run mzsh -- bootstrap --source /absolute/checkout [--legacy-source /absolute/file] [--apply] [--plan-id reviewed-plan-id] [--confirm APPLY]',
+    'bun run mzsh -- update [--source /absolute/checkout] [--apply] [--plan-id reviewed-plan-id] [--confirm APPLY]',
+    'bun run mzsh -- rollback receipt-id [--apply] [--plan-id reviewed-plan-id] [--confirm APPLY]',
   ]);
   expect(checkoutLocalCommandLines).toEqual([
     '  bun run mzsh -- audit [--source /absolute/checkout] [--json]',
-    '  bun run mzsh -- bootstrap --source /absolute/checkout [--legacy-source /absolute/file] [--apply]',
-    '  bun run mzsh -- update [--source /absolute/checkout] [--apply]',
-    '  bun run mzsh -- rollback receipt-id [--apply]',
+    '  bun run mzsh -- bootstrap --source /absolute/checkout [--legacy-source /absolute/file] [--apply] [--plan-id reviewed-plan-id] [--confirm APPLY]',
+    '  bun run mzsh -- update [--source /absolute/checkout] [--apply] [--plan-id reviewed-plan-id] [--confirm APPLY]',
+    '  bun run mzsh -- rollback receipt-id [--apply] [--plan-id reviewed-plan-id] [--confirm APPLY]',
   ]);
 });
 

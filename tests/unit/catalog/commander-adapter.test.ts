@@ -4,10 +4,23 @@ import { runMzshCli, type RunMzshCliDependencies } from '../../../src/cli/run-cl
 
 describe('Commander catalog adapter', () => {
   test('delegates managed parsing to the catalog', () => {
-    expect(parseCommanderArgs(['update', '--source', '/checkout', '--apply'])).toEqual({
+    expect(
+      parseCommanderArgs([
+        'update',
+        '--source',
+        '/checkout',
+        '--apply',
+        '--plan-id',
+        '4b5fd2fd-2f80-4ce9-a8f3-5c12dfacbe49',
+        '--confirm',
+        'APPLY',
+      ])
+    ).toEqual({
       kind: 'update',
       source: '/checkout',
       apply: true,
+      planId: '4b5fd2fd-2f80-4ce9-a8f3-5c12dfacbe49',
+      confirmation: 'APPLY',
     });
   });
 
@@ -15,7 +28,7 @@ describe('Commander catalog adapter', () => {
     const adapter = createCommanderAdapter();
 
     expect(adapter.help()).toContain(
-      'bootstrap --source absolute-path [--legacy-source absolute-path] [--apply]'
+      'bootstrap --source absolute-path [--legacy-source absolute-path] [--apply] [--plan-id reviewed-plan-id] [--confirm APPLY]'
     );
     expect(adapter.help('rollback')).toContain('Risk: destructive');
   });

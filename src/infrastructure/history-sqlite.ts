@@ -1,7 +1,12 @@
 import { Database } from 'bun:sqlite';
 import { join } from 'node:path';
 import { isReviewedPlanId, type ReviewedPlan } from '../domain/action-plan';
-import type { DurablePlanStore, HistoryRecord, HistoryStore } from '../domain/history';
+import type {
+  DurablePlanStore,
+  HistoryRecord,
+  HistoryStore,
+  RecoverySnapshot,
+} from '../domain/history';
 import { OwnerOnlyFilesystem } from './owner-only-filesystem';
 
 interface PlanRow {
@@ -19,6 +24,7 @@ interface HistoryRow {
   target_names: string;
   result: HistoryRecord['result'];
   snapshot_kind: HistoryRecord['snapshot']['kind'];
+  snapshot_json: string;
   occurred_at: string;
 }
 
@@ -35,8 +41,12 @@ export class SqliteHistory implements DurablePlanStore, HistoryStore {
       'CREATE TABLE IF NOT EXISTS reviewed_plans (id TEXT PRIMARY KEY, action TEXT NOT NULL, target_names TEXT NOT NULL, fingerprint TEXT NOT NULL, created_at TEXT NOT NULL)'
     );
     this.database.run(
-      'CREATE TABLE IF NOT EXISTS history (id TEXT PRIMARY KEY, plan_id TEXT NOT NULL, action TEXT NOT NULL, target_names TEXT NOT NULL, result TEXT NOT NULL, snapshot_kind TEXT NOT NULL, occurred_at TEXT NOT NULL)'
+      'CREATE TABLE IF NOT EXISTS history (id TEXT PRIMARY KEY, plan_id TEXT NOT NULL, action TEXT NOT NULL, target_names TEXT NOT NULL, result TEXT NOT NULL, snapshot_kind TEXT NOT NULL, snapshot_json TEXT NOT NULL, occurred_at TEXT NOT NULL)'
     );
+    const columns = this.database.query<{ name: string }, []>('PRAGMA table_info(history)').all();
+    if (!columns.some((column) => column.name === 'snapshot_json')) {
+      this.database.run("ALTER TABLE history ADD COLUMN snapshot_json TEXT NOT NULL DEFAULT '{}'");
+    }
   }
 
   save(plan: ReviewedPlan): void {
@@ -52,9 +62,30 @@ export class SqliteHistory implements DurablePlanStore, HistoryStore {
         plan.fingerprint,
         plan.createdAt
       );
+    this.enforceRetention();
   }
 
   find(id: string): ReviewedPlan | undefined {
+    this.enforceRetention();
+    return this.findStored(id);
+  }
+
+  consume(id: string): ReviewedPlan | undefined {
+    this.enforceRetention();
+    this.database.run('BEGIN IMMEDIATE');
+    try {
+      const plan = this.findStored(id);
+      if (plan !== undefined)
+        this.database.query<never, [string]>('DELETE FROM reviewed_plans WHERE id = ?').run(id);
+      this.database.run('COMMIT');
+      return plan;
+    } catch (error) {
+      this.database.run('ROLLBACK');
+      throw error;
+    }
+  }
+
+  private findStored(id: string): ReviewedPlan | undefined {
     const row = this.database
       .query<PlanRow, [string]>(
         'SELECT id, action, target_names, fingerprint, created_at FROM reviewed_plans WHERE id = ?'
@@ -78,8 +109,8 @@ export class SqliteHistory implements DurablePlanStore, HistoryStore {
   record(record: HistoryRecord): void {
     if (!isHistoryRecord(record)) throw new Error('REDACTED_HISTORY_REQUIRED');
     this.database
-      .query<never, [string, string, string, string, string, string, string]>(
-        'INSERT INTO history (id, plan_id, action, target_names, result, snapshot_kind, occurred_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+      .query<never, [string, string, string, string, string, string, string, string]>(
+        'INSERT INTO history (id, plan_id, action, target_names, result, snapshot_kind, snapshot_json, occurred_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
       )
       .run(
         record.id,
@@ -88,20 +119,24 @@ export class SqliteHistory implements DurablePlanStore, HistoryStore {
         JSON.stringify(record.targetNames),
         record.result,
         record.snapshot.kind,
+        JSON.stringify(record.snapshot),
         record.occurredAt
       );
+    this.enforceRetention();
   }
 
-  complete(planId: string, result: 'applied' | 'failed'): void {
+  complete(attemptId: string, result: 'applied' | 'failed'): void {
     this.database
-      .query<never, [string, string]>('UPDATE history SET result = ? WHERE plan_id = ?')
-      .run(result, planId);
+      .query<never, [string, string]>('UPDATE history SET result = ? WHERE id = ?')
+      .run(result, attemptId);
+    this.enforceRetention();
   }
 
   list(limit: number): readonly HistoryRecord[] {
+    this.enforceRetention();
     return this.database
       .query<HistoryRow, [number]>(
-        'SELECT id, plan_id, action, target_names, result, snapshot_kind, occurred_at FROM history ORDER BY occurred_at ASC LIMIT ?'
+        'SELECT id, plan_id, action, target_names, result, snapshot_kind, snapshot_json, occurred_at FROM history ORDER BY occurred_at DESC LIMIT ?'
       )
       .all(limit)
       .flatMap((row) => historyRecord(row));
@@ -114,11 +149,18 @@ export class SqliteHistory implements DurablePlanStore, HistoryStore {
     this.database
       .query<never, [string]>('DELETE FROM history WHERE occurred_at < ?')
       .run(before.toISOString());
+    this.database
+      .query<never, [string]>('DELETE FROM reviewed_plans WHERE created_at < ?')
+      .run(before.toISOString());
     return rows.map((row) => row.id);
   }
 
   close(): void {
     this.database.close();
+  }
+
+  private enforceRetention(now = new Date()): void {
+    this.prune(new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000));
   }
 }
 
@@ -158,9 +200,47 @@ function isHistoryRecord(record: HistoryRecord): boolean {
     parseTargetNames(JSON.stringify(record.targetNames)) !== undefined &&
     record.planState === 'reviewed' &&
     (record.result === 'pending' || record.result === 'applied' || record.result === 'failed') &&
-    (record.snapshot.kind === 'managed-state' || record.snapshot.kind === 'adoption-receipt') &&
+    isRecoverySnapshot(record.snapshot) &&
     isIsoTimestamp(record.occurredAt)
   );
+}
+
+function isRecoverySnapshot(value: unknown): value is RecoverySnapshot {
+  if (typeof value !== 'object' || value === null) return false;
+  const snapshot = value as {
+    id?: unknown;
+    kind?: unknown;
+    capturedAt?: unknown;
+    targets?: unknown;
+  };
+  return (
+    typeof snapshot.id === 'string' &&
+    isReviewedPlanId(snapshot.id) &&
+    (snapshot.kind === 'managed-state' || snapshot.kind === 'adoption-receipt') &&
+    typeof snapshot.capturedAt === 'string' &&
+    isIsoTimestamp(snapshot.capturedAt) &&
+    Array.isArray(snapshot.targets) &&
+    snapshot.targets.length > 0 &&
+    snapshot.targets.every(isRecoveryTarget)
+  );
+}
+
+function isRecoveryTarget(value: unknown): value is RecoverySnapshot['targets'][number] {
+  if (typeof value !== 'object' || value === null) return false;
+  const target = value as { name?: unknown; state?: unknown };
+  return (
+    isTargetName(target.name) &&
+    (target.state === 'absent' ||
+      target.state === 'file' ||
+      target.state === 'symlink' ||
+      target.state === 'directory' ||
+      target.state === 'other')
+  );
+}
+
+function parseRecoverySnapshot(value: string): RecoverySnapshot | undefined {
+  const parsed: unknown = JSON.parse(value);
+  return isRecoverySnapshot(parsed) ? parsed : undefined;
 }
 
 function isAction(value: unknown): value is HistoryRecord['action'] {
@@ -174,7 +254,9 @@ function isIsoTimestamp(value: string): boolean {
 
 function historyRecord(row: HistoryRow): HistoryRecord[] {
   const targetNames = parseTargetNames(row.target_names);
-  if (targetNames === undefined) return [];
+  const snapshot = parseRecoverySnapshot(row.snapshot_json);
+  if (targetNames === undefined || snapshot === undefined || row.snapshot_kind !== snapshot.kind)
+    return [];
   const record: HistoryRecord = {
     id: row.id,
     planId: row.plan_id,
@@ -182,7 +264,7 @@ function historyRecord(row: HistoryRow): HistoryRecord[] {
     targetNames,
     planState: 'reviewed',
     result: row.result,
-    snapshot: { kind: row.snapshot_kind },
+    snapshot,
     occurredAt: row.occurred_at,
   };
   return isHistoryRecord(record) ? [record] : [];

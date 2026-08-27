@@ -25,7 +25,7 @@ export class ReviewedPlanApplicationService {
   ) {}
 
   apply<Result>(input: ApplyReviewedPlanInput<Result>): Result {
-    const plan = input.planId === undefined ? undefined : this.plans.find(input.planId);
+    const plan = input.planId === undefined ? undefined : this.plans.consume(input.planId);
     if (
       plan === undefined ||
       input.confirmation !== 'APPLY' ||
@@ -35,8 +35,9 @@ export class ReviewedPlanApplicationService {
       throw new Error('PLAN_CONFIRMATION_REQUIRED');
     }
     const snapshot = input.snapshot();
+    const attemptId = randomUUID();
     this.history.record({
-      id: randomUUID(),
+      id: attemptId,
       planId: plan.id,
       action: plan.action,
       targetNames: plan.targetNames,
@@ -47,10 +48,10 @@ export class ReviewedPlanApplicationService {
     });
     try {
       const result = input.execute();
-      this.history.complete(plan.id, 'applied');
+      this.history.complete(attemptId, 'applied');
       return result;
     } catch (error) {
-      this.history.complete(plan.id, 'failed');
+      this.history.complete(attemptId, 'failed');
       throw error;
     }
   }

@@ -11,4 +11,10 @@ export class InMemoryPlanStore implements DurablePlanStore {
   find(id: string): ReviewedPlan | undefined {
     return this.plans.get(id);
   }
+
+  consume(id: string): ReviewedPlan | undefined {
+    const plan = this.plans.get(id);
+    if (plan !== undefined) this.plans.delete(id);
+    return plan;
+  }
 }
