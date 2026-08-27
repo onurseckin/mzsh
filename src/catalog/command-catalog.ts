@@ -116,11 +116,11 @@ const commands: readonly CatalogCommand[] = [
   },
   {
     name: 'env',
-    summary: 'Access the private environment boundary.',
+    summary: 'Inspect private environment metadata or open its protected setter.',
     risk: 'sensitive',
-    available: false,
+    available: true,
     palette: { keywords: ['env', 'private'] },
-    parser: { kind: 'placeholder', flags: [], positional: 'none' },
+    parser: { kind: 'env', flags: [jsonFlag], positional: 'environment-operation' },
   },
   {
     name: 'tui',
@@ -175,7 +175,9 @@ function formatUsage(command: CatalogCommand, style: CatalogUsageStyle): string 
       ? ' receipt-id'
       : command.parser.positional === 'optional-category'
         ? ' [category]'
-        : '';
+        : command.parser.positional === 'environment-operation'
+          ? ' <list|get|set> [name]'
+          : '';
   const flags = command.parser.flags
     .map((flag) => {
       const value = formatFlagValue(flag, style);
@@ -262,6 +264,17 @@ export function parseCatalogArgs(args: readonly string[]): CatalogParseResult {
           json,
         }
       : { kind: 'usage-error', code: 'unexpected-positional' };
+  }
+  if (command.parser.kind === 'env') {
+    const action = positionals[0];
+    if (action === 'list' && positionals.length === 1) return { kind: 'env', action, json };
+    if ((action === 'get' || action === 'set') && positionals.length === 2) {
+      const name = positionals[1]!;
+      return action === 'set' && json
+        ? { kind: 'usage-error', code: 'invalid-flags' }
+        : { kind: 'env', action, name, json };
+    }
+    return { kind: 'usage-error', code: 'unexpected-positional' };
   }
   if (command.parser.kind === 'bootstrap') {
     if (positionals.length > 0) return { kind: 'usage-error', code: 'unexpected-positional' };

@@ -17,6 +17,7 @@ import {
 import { CategoryRegistry } from '../domain/categories';
 import { createReviewedPlan } from '../domain/action-plan';
 import { createRecoverySnapshot } from '../domain/history';
+import type { EnvironmentService } from '../application/environment-service';
 import { SqliteHistory } from '../infrastructure/history-sqlite';
 import { NodeAdoptionFilesystem } from '../infrastructure/adoption-filesystem';
 import { EnvironmentProbes } from '../infrastructure/environment-probes';
@@ -24,12 +25,12 @@ import { InventoryProbes } from '../infrastructure/inventory-probes';
 import { readMachineManifest } from '../infrastructure/manifest-reader';
 import { ZshPreflight } from '../infrastructure/zsh-preflight';
 import { parseArguments } from './parse-arguments';
+import { runEnvironmentCommand } from './environment-command';
 
-type Preflight = {
-  preflight(
-    plan: AdoptionPlan
-  ): { kind: 'passed' } | { kind: 'failed'; code: 'syntax-invalid' | 'isolated-startup-failed' };
-};
+type PreflightResult =
+  | { kind: 'passed' }
+  | { kind: 'failed'; code: 'syntax-invalid' | 'isolated-startup-failed' };
+type Preflight = { preflight(plan: AdoptionPlan): PreflightResult };
 type Probes = {
   collect(options: {
     home: string;
@@ -41,6 +42,8 @@ type Probes = {
 type InventoryCollector = {
   collect(input: InventoryCollectionInput): readonly InventoryRecord[];
 };
+type EnvironmentOperations = Pick<EnvironmentService, 'list' | 'get' | 'set'>;
+type AuthenticationLease = { acquire(): unknown };
 
 export interface RunMzshCliDependencies {
   home: string;
@@ -51,6 +54,8 @@ export interface RunMzshCliDependencies {
   filesystem?: NodeAdoptionFilesystem;
   probes?: Probes;
   inventory?: InventoryCollector;
+  environment?: EnvironmentOperations;
+  authLease?: AuthenticationLease;
   preflight?: Preflight;
   id?: () => string;
   reviewedPlanId?: () => string;
@@ -161,6 +166,7 @@ export function runMzshCli(args: readonly string[], dependencies: RunMzshCliDepe
     dependencies.write('MZSH_USAGE_command-unavailable');
     return 2;
   }
+  if (parsed.kind === 'env') return runEnvironmentCommand(parsed, dependencies);
   const filesystem = dependencies.filesystem ?? new NodeAdoptionFilesystem();
   if (parsed.kind === 'audit') {
     const repositoryRoot = parsed.source ?? dependencies.repositoryRoot;

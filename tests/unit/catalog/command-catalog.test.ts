@@ -111,4 +111,29 @@ describe('command catalog', () => {
       code: 'invalid-flags',
     });
   });
+
+  test('routes environment operations without accepting a value argument', () => {
+    expect(catalog.require('env').available).toBe(true);
+    expect(parseCatalogArgs(['env', 'list', '--json'])).toEqual({
+      kind: 'env',
+      action: 'list',
+      json: true,
+    });
+    expect(parseCatalogArgs(['env', 'get', 'SERVICE_TOKEN'])).toEqual({
+      kind: 'env',
+      action: 'get',
+      name: 'SERVICE_TOKEN',
+      json: false,
+    });
+    expect(parseCatalogArgs(['env', 'set', 'SERVICE_TOKEN'])).toEqual({
+      kind: 'env',
+      action: 'set',
+      name: 'SERVICE_TOKEN',
+      json: false,
+    });
+    expect(parseCatalogArgs(['env', 'set', 'SERVICE_TOKEN', 'private'])).toEqual({
+      kind: 'usage-error',
+      code: 'unexpected-positional',
+    });
+  });
 });
