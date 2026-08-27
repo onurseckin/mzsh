@@ -22,7 +22,7 @@
     "lint:fix": "oxlint --type-aware --fix .",
     "format": "oxfmt",
     "format:check": "oxfmt --check .",
-    "shell:check": "bash scripts/check-shell-quality.sh",
+    "shell:check": "mise exec -- bash scripts/check-shell-quality.sh",
     "line:check": "bun scripts/check-typescript-line-limits.ts",
     "quality:check": "bun run lint && bun run format:check && bun run shell:check && bun run line:check",
     "test:unit": "bun test --no-isolate tests/unit",

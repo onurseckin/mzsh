@@ -253,7 +253,7 @@ export class InteractiveMenu {
 
       // Exit the process after successfully opening the file
       process.exit(0);
-    } catch (_error: unknown) {
+    } catch {
       // This catch block should rarely be reached since we handle exits directly
       console.log(chalk.yellow('\nOperation cancelled.'));
       process.exit(0);

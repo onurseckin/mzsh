@@ -58,14 +58,14 @@ in PATH before narrow destructive-operation checks.
 
 ## Audiences and Diátaxis ownership
 
-| Audience | Need | Diátaxis material |
-| --- | --- | --- |
-| New operator | Safely adopt a checkout on a new machine | Tutorial: new-machine flow |
-| Existing operator | Audit, update, recover, or configure one concern | How-to guides |
-| Automation author | Exact commands, flags, exit behavior, and output | CLI and receipt reference |
-| Shell maintainer | Understand loader boundaries, order, and PATH policy | Architecture explanation plus portable reference |
-| Security reviewer | Verify threat boundaries and recovery behavior | Architecture explanation, ADR, and safety-shim reference |
-| Contributor | Change documentation or code without contradicting contracts | Architecture, reference, ADR index, and quality reference |
+| Audience          | Need                                                         | Diátaxis material                                         |
+| ----------------- | ------------------------------------------------------------ | --------------------------------------------------------- |
+| New operator      | Safely adopt a checkout on a new machine                     | Tutorial: new-machine flow                                |
+| Existing operator | Audit, update, recover, or configure one concern             | How-to guides                                             |
+| Automation author | Exact commands, flags, exit behavior, and output             | CLI and receipt reference                                 |
+| Shell maintainer  | Understand loader boundaries, order, and PATH policy         | Architecture explanation plus portable reference          |
+| Security reviewer | Verify threat boundaries and recovery behavior               | Architecture explanation, ADR, and safety-shim reference  |
+| Contributor       | Change documentation or code without contradicting contracts | Architecture, reference, ADR index, and quality reference |
 
 ## Target documentation tree
 
@@ -110,13 +110,13 @@ portable/zsh/
 
 ### Canonical ownership and disposition
 
-| Current material | Disposition | Canonical replacement or role |
-| --- | --- | --- |
-| `README.md` | Rewrite and retain | Landing page, precise quick start, basic commands, safety summary, links |
-| `docs/planning/mzsh-portability/README.md` | Decompose, then remove | Guide and architecture pages listed above |
-| `portable/zsh/README.md` | Retain and narrow | Exact loader, module, variable, completion, FZF, and runtime data-boundary reference |
-| `docs/decisions/001-managed-dotfiles.md` | Retain unchanged | Accepted decision rationale |
-| `docs/decisions/README.md` | Add | ADR index with status and scope |
+| Current material                           | Disposition            | Canonical replacement or role                                                        |
+| ------------------------------------------ | ---------------------- | ------------------------------------------------------------------------------------ |
+| `README.md`                                | Rewrite and retain     | Landing page, precise quick start, basic commands, safety summary, links             |
+| `docs/planning/mzsh-portability/README.md` | Decompose, then remove | Guide and architecture pages listed above                                            |
+| `portable/zsh/README.md`                   | Retain and narrow      | Exact loader, module, variable, completion, FZF, and runtime data-boundary reference |
+| `docs/decisions/001-managed-dotfiles.md`   | Retain unchanged       | Accepted decision rationale                                                          |
+| `docs/decisions/README.md`                 | Add                    | ADR index with status and scope                                                      |
 
 The old portability guide must remain until all internal links target its
 replacements. The removal commit must not leave a redirect-like duplicate that
@@ -164,15 +164,15 @@ must be dry-run reviewed before `--apply`.
 reference. Each guide starts with prerequisites, gives one safe outcome, states
 when `--apply` is needed, and links to the exact CLI reference.
 
-| Guide | Goal and required coverage |
-| --- | --- |
-| `new-machine.md` | Tutorial from reviewed clone through first receipt and opening a fresh shell |
-| `audit-and-read-findings.md` | Read human and JSON audit output; distinguish information, warning, and error findings |
-| `bootstrap-existing-zsh.md` | Dry-run a legacy-source adoption, inspect selected-assignment count, apply an accepted plan |
-| `update-a-checkout.md` | Update a checkout through normal source control outside MZSH, then plan/apply local adoption |
-| `rollback-and-recovery.md` | Locate receipt ID, inspect dry rollback, handle conflict, apply rollback, and retain backups correctly |
+| Guide                                    | Goal and required coverage                                                                                    |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `new-machine.md`                         | Tutorial from reviewed clone through first receipt and opening a fresh shell                                  |
+| `audit-and-read-findings.md`             | Read human and JSON audit output; distinguish information, warning, and error findings                        |
+| `bootstrap-existing-zsh.md`              | Dry-run a legacy-source adoption, inspect selected-assignment count, apply an accepted plan                   |
+| `update-a-checkout.md`                   | Update a checkout through normal source control outside MZSH, then plan/apply local adoption                  |
+| `rollback-and-recovery.md`               | Locate receipt ID, inspect dry rollback, handle conflict, apply rollback, and retain backups correctly        |
 | `configure-private-and-runtime-paths.md` | Create safe private state and owner-only data-only runtime directory entries without source/eval instructions |
-| `configure-completions-and-fzf.md` | Configure existing completion locations and opt-in static FZF files without generated-shell evaluation |
+| `configure-completions-and-fzf.md`       | Configure existing completion locations and opt-in static FZF files without generated-shell evaluation        |
 
 ## Reference contracts
 
@@ -266,14 +266,14 @@ layer.
 
 The current protected behaviors are intentionally narrow:
 
-| Family | Refused operation |
-| --- | --- |
-| Package-runner forms | `prisma db push`, including managed package-runner forms |
-| `rm` | Recursive removal targeting normalized `/`, `/Users`, or `$HOME` |
-| `rsync` | `--delete` when the final non-option destination is a protected root |
-| `find` | `-delete` from a protected root |
-| `diskutil` | Destructive disk erase, repartition, zero, random, secure erase, or partition verbs |
-| `dd` | Output targeting `/dev/diskN` or `/dev/rdiskN` |
+| Family               | Refused operation                                                                   |
+| -------------------- | ----------------------------------------------------------------------------------- |
+| Package-runner forms | `prisma db push`, including managed package-runner forms                            |
+| `rm`                 | Recursive removal targeting normalized `/`, `/Users`, or `$HOME`                    |
+| `rsync`              | `--delete` when the final non-option destination is a protected root                |
+| `find`               | `-delete` from a protected root                                                     |
+| `diskutil`           | Destructive disk erase, repartition, zero, random, secure erase, or partition verbs |
+| `dd`                 | Output targeting `/dev/diskN` or `/dev/rdiskN`                                      |
 
 Refusal output is fixed and redacted. It identifies the safe migration/targeted
 command category without echoing user arguments, normalized targets, paths, or
@@ -315,27 +315,27 @@ after external source-control work; inspect rollback dry run before apply.
 
 The recovery guide distinguishes these outcomes:
 
-| Outcome | Operator action |
-| --- | --- |
-| Planning rejection | Read the stable rejection code and repair the local prerequisite; do not force a write |
-| Preflight failure | Repair portable syntax or isolated-startup condition, then create a fresh plan |
-| Apply failure | Preserve managed state/backups, inspect the fixed result, and retry only after the cause is repaired |
-| Rollback conflict | Do not overwrite changed targets; inspect the conflict and choose an explicit recovery path |
-| Receipt invalid | Restore owner-only state/backup safety or use retained protected evidence; do not edit receipt JSON manually |
-| Missing optional integration | Configure it outside MZSH or leave it absent; startup remains quiet and functional |
+| Outcome                      | Operator action                                                                                              |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Planning rejection           | Read the stable rejection code and repair the local prerequisite; do not force a write                       |
+| Preflight failure            | Repair portable syntax or isolated-startup condition, then create a fresh plan                               |
+| Apply failure                | Preserve managed state/backups, inspect the fixed result, and retry only after the cause is repaired         |
+| Rollback conflict            | Do not overwrite changed targets; inspect the conflict and choose an explicit recovery path                  |
+| Receipt invalid              | Restore owner-only state/backup safety or use retained protected evidence; do not edit receipt JSON manually |
+| Missing optional integration | Configure it outside MZSH or leave it absent; startup remains quiet and functional                           |
 
 ## Test matrix and fake-only safety policy
 
-| Area | Required regression evidence |
-| --- | --- |
-| Documentation commands | Checkout-local invocation and no-bare-command scan; parser accepts every documented form |
-| README links | Relative-link check and no duplicate canonical command table |
-| CLI grammar | Duplicate, unknown, misplaced, relative, traversal, dry-run, and apply cases |
-| Audit | JSON/human redaction, safe pnpm runtime entry, Java information distinction, probe-failure redaction |
-| Adoption | Root/target safety, preflight-before-write, atomic failure recovery, receipt publication, no secret serialization |
-| Rollback | Receipt/backup validation, conflict dry run, compensation, repository-unavailable rollback |
-| Portable shell | Canonical order, login/interactive boundary, one completion owner, private-last rollback/retry, shim-first/no-duplicates |
-| Shim policy | Exact 12-link topology, fake-only allowed delegation with exact argv, each refusal family, recursion and 127 absence |
+| Area                   | Required regression evidence                                                                                             |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Documentation commands | Checkout-local invocation and no-bare-command scan; parser accepts every documented form                                 |
+| README links           | Relative-link check and no duplicate canonical command table                                                             |
+| CLI grammar            | Duplicate, unknown, misplaced, relative, traversal, dry-run, and apply cases                                             |
+| Audit                  | JSON/human redaction, safe pnpm runtime entry, Java information distinction, probe-failure redaction                     |
+| Adoption               | Root/target safety, preflight-before-write, atomic failure recovery, receipt publication, no secret serialization        |
+| Rollback               | Receipt/backup validation, conflict dry run, compensation, repository-unavailable rollback                               |
+| Portable shell         | Canonical order, login/interactive boundary, one completion owner, private-last rollback/retry, shim-first/no-duplicates |
+| Shim policy            | Exact 12-link topology, fake-only allowed delegation with exact argv, each refusal family, recursion and 127 absence     |
 
 No test may invoke a real destructive command, copy local private content, rely
 on a personal home path, or assert a credential assignment name or value.

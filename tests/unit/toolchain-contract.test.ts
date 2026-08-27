@@ -59,10 +59,13 @@ test('uses exact stable dependency pins and named validation suites', () => {
   expect(manifest.scripts.completion).toBe(
     'bun run test:integration --test-name-pattern completion'
   );
+  expect(manifest.scripts['shell:check']).toBe('mise exec -- bash scripts/check-shell-quality.sh');
 });
 
 test('defines the repository-owned quality and contributor contracts', () => {
   const tsconfig: unknown = JSON.parse(readFileSync(join(root, 'tsconfig.json'), 'utf8'));
+  const mise = readFileSync(join(root, 'mise.toml'), 'utf8');
+  const lefthook = readFileSync(join(root, 'lefthook.yml'), 'utf8');
 
   expect(tsconfig).toMatchObject({
     compilerOptions: {
@@ -74,4 +77,9 @@ test('defines the repository-owned quality and contributor contracts', () => {
   expect(existsSync(join(root, '.agents', 'contributing.md'))).toBe(true);
   expect(existsSync(join(root, '.agents', 'safety.md'))).toBe(true);
   expect(existsSync(join(root, '.cursor'))).toBe(false);
+  expect(mise).toMatch(/^bun\s*=\s*"1\.4\.0"$/m);
+  expect(mise).toMatch(/^lefthook\s*=\s*"2\.1\.10"$/m);
+  expect(lefthook).toMatch(
+    /^pre-commit:\n  commands:\n    quality:\n      run: bun run quality:check$/m
+  );
 });
