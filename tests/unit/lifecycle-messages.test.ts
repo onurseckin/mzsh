@@ -25,6 +25,7 @@ test('guides legacy lifecycle callers through the managed reversible workflow', 
     'bun run mzsh -- setup [--apply] [--plan-id reviewed-plan-id] [--confirm APPLY]',
     'bun run mzsh -- inventory [category] [--json]',
     'bun run mzsh -- env <list|get|set> [name] [--json]',
+    'bun run mzsh -- tui',
   ]);
   expect(installMessages.info.starting).toContain('bun run mzsh -- audit');
   expect(installMessages.errors.bootstrapFailed.action).toContain(
@@ -48,6 +49,7 @@ test('guides legacy lifecycle callers through the managed reversible workflow', 
     'bun run mzsh -- setup [--apply] [--plan-id reviewed-plan-id] [--confirm APPLY]',
     'bun run mzsh -- inventory [category] [--json]',
     'bun run mzsh -- env <list|get|set> [name] [--json]',
+    'bun run mzsh -- tui',
   ]);
   expect(checkoutLocalCommandLines).toEqual([
     '  bun run mzsh -- audit [--source /absolute/checkout] [--json]',
@@ -57,6 +59,7 @@ test('guides legacy lifecycle callers through the managed reversible workflow', 
     '  bun run mzsh -- setup [--apply] [--plan-id reviewed-plan-id] [--confirm APPLY]',
     '  bun run mzsh -- inventory [category] [--json]',
     '  bun run mzsh -- env <list|get|set> [name] [--json]',
+    '  bun run mzsh -- tui',
   ]);
 });
 

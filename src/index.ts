@@ -36,6 +36,7 @@ import {
 } from './infrastructure/owner-only-private-environment';
 import { OsAuth } from './infrastructure/os-auth';
 import { openPrivateBoundary } from './infrastructure/open-private-boundary';
+import { createTuiLauncher } from './tui/create-tui';
 
 export { renderZshCompletion } from './catalog/completion';
 
@@ -86,6 +87,13 @@ export function createManagedCliDependencies(
       authorization: input.authorization ?? new OsAuth(),
       store: new OwnerOnlyAuthLeaseStore(join(managedRoot, 'auth-lease.json')),
       owner: input.owner ?? (() => String(process.getuid?.() ?? 'unknown')),
+    }),
+    tui: createTuiLauncher({
+      state: () => ({
+        screen: 'dashboard',
+        inventory: { healthy: 0, attention: 0 },
+        history: [],
+      }),
     }),
   };
 }

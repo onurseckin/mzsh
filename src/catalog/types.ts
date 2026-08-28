@@ -16,10 +16,21 @@ export type CatalogParser =
   | { kind: 'bootstrap'; flags: readonly CatalogFlag[]; positional: 'none' }
   | { kind: 'update'; flags: readonly CatalogFlag[]; positional: 'none' }
   | { kind: 'rollback'; flags: readonly CatalogFlag[]; positional: 'receipt-id' }
+  | { kind: 'tui'; flags: readonly CatalogFlag[]; positional: 'none' }
   | { kind: 'placeholder'; flags: readonly CatalogFlag[]; positional: 'none' };
 
 export type CatalogPaletteMetadata = {
   keywords: readonly string[];
+};
+
+export type CatalogTuiMetadata = {
+  readonly keys: readonly ['space', string];
+  readonly leader: 'space';
+  readonly navigation: readonly [
+    { readonly screen: 'dashboard'; readonly keys: readonly ['g', 'd'] },
+    { readonly screen: 'plan-review'; readonly keys: readonly ['g', 'p'] },
+    { readonly screen: 'history'; readonly keys: readonly ['g', 'h'] },
+  ];
 };
 
 export type CatalogCommand =
@@ -29,6 +40,7 @@ export type CatalogCommand =
       risk: CommandRisk;
       available: true;
       palette: CatalogPaletteMetadata;
+      tui: CatalogTuiMetadata;
       parser: Extract<CatalogParser, { kind: 'setup' }>;
     }
   | {
@@ -37,6 +49,7 @@ export type CatalogCommand =
       risk: CommandRisk;
       available: true;
       palette: CatalogPaletteMetadata;
+      tui: CatalogTuiMetadata;
       parser: Extract<CatalogParser, { kind: 'audit' }>;
     }
   | {
@@ -45,6 +58,7 @@ export type CatalogCommand =
       risk: CommandRisk;
       available: true;
       palette: CatalogPaletteMetadata;
+      tui: CatalogTuiMetadata;
       parser: Extract<CatalogParser, { kind: 'bootstrap' }>;
     }
   | {
@@ -53,6 +67,7 @@ export type CatalogCommand =
       risk: CommandRisk;
       available: true;
       palette: CatalogPaletteMetadata;
+      tui: CatalogTuiMetadata;
       parser: Extract<CatalogParser, { kind: 'update' }>;
     }
   | {
@@ -61,6 +76,7 @@ export type CatalogCommand =
       risk: CommandRisk;
       available: true;
       palette: CatalogPaletteMetadata;
+      tui: CatalogTuiMetadata;
       parser: Extract<CatalogParser, { kind: 'rollback' }>;
     }
   | {
@@ -69,6 +85,7 @@ export type CatalogCommand =
       risk: CommandRisk;
       available: true;
       palette: CatalogPaletteMetadata;
+      tui: CatalogTuiMetadata;
       parser: Extract<CatalogParser, { kind: 'inventory' }>;
     }
   | {
@@ -77,15 +94,26 @@ export type CatalogCommand =
       risk: CommandRisk;
       available: true;
       palette: CatalogPaletteMetadata;
+      tui: CatalogTuiMetadata;
       parser: Extract<CatalogParser, { kind: 'env' }>;
     }
   | {
-      name: 'history' | 'tui';
+      name: 'history';
       summary: string;
       risk: CommandRisk;
       available: false;
       palette: CatalogPaletteMetadata;
+      tui: CatalogTuiMetadata;
       parser: Extract<CatalogParser, { kind: 'placeholder' }>;
+    }
+  | {
+      name: 'tui';
+      summary: string;
+      risk: CommandRisk;
+      available: true;
+      palette: CatalogPaletteMetadata;
+      tui: CatalogTuiMetadata;
+      parser: Extract<CatalogParser, { kind: 'tui' }>;
     };
 
 export type CatalogCommandName = CatalogCommand['name'];
@@ -96,6 +124,7 @@ export type ManagedCommand =
   | { kind: 'env'; action: 'list'; json: boolean }
   | { kind: 'env'; action: 'get'; name: string; json: boolean }
   | { kind: 'env'; action: 'set'; name: string; json: boolean }
+  | { kind: 'tui' }
   | (MutationCommand & { kind: 'setup' })
   | (MutationCommand & { kind: 'bootstrap'; source: string; legacySource?: string })
   | (MutationCommand & { kind: 'update' })

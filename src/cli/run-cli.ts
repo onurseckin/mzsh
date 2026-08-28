@@ -27,6 +27,7 @@ import { ZshPreflight } from '../infrastructure/zsh-preflight';
 import { parseArguments } from './parse-arguments';
 import { runEnvironmentCommand } from './environment-command';
 import { runLifecycleCommand } from './setup-command';
+import type { TuiLauncher } from '../tui/create-tui';
 
 type PreflightResult =
   | { kind: 'passed' }
@@ -64,6 +65,7 @@ export interface RunMzshCliDependencies {
   rollback?: typeof rollbackAdoption;
   rollbackStateDigest?: typeof rollbackStateDigest;
   setup?: import('../application/setup-service').SetupService;
+  tui?: TuiLauncher;
 }
 
 function defaultInventoryCollector(): InventoryCollector {
@@ -167,6 +169,14 @@ export function runMzshCli(args: readonly string[], dependencies: RunMzshCliDepe
   if (parsed.kind === 'catalog-placeholder') {
     dependencies.write('MZSH_USAGE_command-unavailable');
     return 2;
+  }
+  if (parsed.kind === 'tui') {
+    if (dependencies.tui === undefined) {
+      dependencies.write('MZSH_USAGE_command-unavailable');
+      return 2;
+    }
+    dependencies.tui.launch();
+    return 0;
   }
   if (parsed.kind === 'env') return runEnvironmentCommand(parsed, dependencies);
   if (parsed.kind === 'setup' || parsed.kind === 'update')

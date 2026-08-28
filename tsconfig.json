@@ -13,6 +13,7 @@
     "allowSyntheticDefaultImports": true,
     "resolveJsonModule": true,
     "jsx": "react-jsx",
+    "jsxImportSource": "@opentui/react",
     "strict": true,
     "skipLibCheck": true,
     "noFallthroughCasesInSwitch": true,

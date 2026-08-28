@@ -49,6 +49,16 @@ const legacySourceFlag: CatalogFlag = {
   description: 'Inspect one absolute legacy configuration path during adoption.',
 };
 
+const navigation = [
+  { screen: 'dashboard', keys: ['g', 'd'] },
+  { screen: 'plan-review', keys: ['g', 'p'] },
+  { screen: 'history', keys: ['g', 'h'] },
+] as const;
+
+function tui(keys: readonly ['space', string]) {
+  return { keys, leader: 'space' as const, navigation };
+}
+
 const commands: readonly CatalogCommand[] = [
   {
     name: 'audit',
@@ -56,6 +66,7 @@ const commands: readonly CatalogCommand[] = [
     risk: 'read-only',
     available: true,
     palette: { keywords: ['audit', 'inspect'] },
+    tui: tui(['space', 'a']),
     parser: { kind: 'audit', flags: [sourceFlag, auditJsonFlag], positional: 'none' },
   },
   {
@@ -64,6 +75,7 @@ const commands: readonly CatalogCommand[] = [
     risk: 'destructive',
     available: true,
     palette: { keywords: ['bootstrap', 'adopt'] },
+    tui: tui(['space', 'b']),
     parser: {
       kind: 'bootstrap',
       flags: [
@@ -82,6 +94,7 @@ const commands: readonly CatalogCommand[] = [
     risk: 'destructive',
     available: true,
     palette: { keywords: ['update', 'plan'] },
+    tui: tui(['space', 'u']),
     parser: {
       kind: 'update',
       flags: [applyFlag, planIdFlag, confirmFlag],
@@ -94,6 +107,7 @@ const commands: readonly CatalogCommand[] = [
     risk: 'destructive',
     available: true,
     palette: { keywords: ['rollback', 'receipt'] },
+    tui: tui(['space', 'r']),
     parser: {
       kind: 'rollback',
       flags: [applyFlag, planIdFlag, confirmFlag],
@@ -106,6 +120,7 @@ const commands: readonly CatalogCommand[] = [
     risk: 'destructive',
     available: true,
     palette: { keywords: ['setup', 'install'] },
+    tui: tui(['space', 's']),
     parser: {
       kind: 'setup',
       flags: [applyFlag, planIdFlag, confirmFlag],
@@ -118,6 +133,7 @@ const commands: readonly CatalogCommand[] = [
     risk: 'read-only',
     available: false,
     palette: { keywords: ['history', 'receipts'] },
+    tui: tui(['space', 'h']),
     parser: { kind: 'placeholder', flags: [], positional: 'none' },
   },
   {
@@ -126,6 +142,7 @@ const commands: readonly CatalogCommand[] = [
     risk: 'read-only',
     available: true,
     palette: { keywords: ['inventory', 'discover'] },
+    tui: tui(['space', 'i']),
     parser: { kind: 'inventory', flags: [inventoryJsonFlag], positional: 'optional-category' },
   },
   {
@@ -134,15 +151,17 @@ const commands: readonly CatalogCommand[] = [
     risk: 'sensitive',
     available: true,
     palette: { keywords: ['env', 'private'] },
+    tui: tui(['space', 'e']),
     parser: { kind: 'env', flags: [environmentJsonFlag], positional: 'environment-operation' },
   },
   {
     name: 'tui',
     summary: 'Open the full-screen MZSH interface.',
     risk: 'read-only',
-    available: false,
+    available: true,
     palette: { keywords: ['tui', 'interactive'] },
-    parser: { kind: 'placeholder', flags: [], positional: 'none' },
+    tui: tui(['space', 't']),
+    parser: { kind: 'tui', flags: [], positional: 'none' },
   },
 ];
 
@@ -250,6 +269,11 @@ export function parseCatalogArgs(args: readonly string[]): CatalogParseResult {
   if (command.parser.kind === 'placeholder') {
     return positionals.length === 0
       ? { kind: 'catalog-placeholder', command: command.name }
+      : { kind: 'usage-error', code: 'unexpected-positional' };
+  }
+  if (command.parser.kind === 'tui') {
+    return positionals.length === 0
+      ? { kind: 'tui' }
       : { kind: 'usage-error', code: 'unexpected-positional' };
   }
   const source = values.get('source');
