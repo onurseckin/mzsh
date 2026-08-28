@@ -1,5 +1,8 @@
 # ADR-001: Managed reversible dotfiles
 
+[Previous: decisions index](README.md) ·
+[Index: repository README](../../README.md)
+
 ## Status
 
 Accepted

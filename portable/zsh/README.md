@@ -1,5 +1,7 @@
 # Portable Zsh foundation
 
+[Index: repository README](../../README.md)
+
 `portable/zsh` is MZSH's non-secret shell foundation. It is safe to keep in a
 repository because it contains only module logic and configuration contracts;
 private exports remain outside this tree.

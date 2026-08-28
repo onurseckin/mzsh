@@ -148,8 +148,8 @@ The basic daily commands are:
 
 ```sh
 bun run mzsh -- audit
-bun run mzsh -- update --source "$PWD"
-bun run mzsh -- update --source "$PWD" --apply
+bun run mzsh -- update
+bun run mzsh -- update --apply
 bun run mzsh -- rollback receipt-id
 bun run mzsh -- rollback receipt-id --apply
 ```
@@ -182,7 +182,7 @@ retired route behavior. Its syntax must match the parser exactly:
 ```text
 bun run mzsh -- audit [--source /absolute/checkout] [--json]
 bun run mzsh -- bootstrap --source /absolute/checkout [--legacy-source /absolute/file] [--apply]
-bun run mzsh -- update [--source /absolute/checkout] [--apply]
+bun run mzsh -- update [--apply]
 bun run mzsh -- rollback receipt-id [--apply]
 ```
 
