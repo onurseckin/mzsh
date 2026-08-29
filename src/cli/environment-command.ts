@@ -11,7 +11,8 @@ type EnvironmentCommand = Extract<ManagedCommand, { kind: 'env' }>;
 function project(
   value: RedactedEnvironmentRecord | undefined
 ): RedactedEnvironmentRecord | undefined {
-  if (value === undefined || !isEnvironmentName(value.name)) return undefined;
+  if (value === undefined) return undefined;
+  if (!isEnvironmentName(value.name)) return undefined;
   return { name: value.name, value: redactedValue };
 }
 

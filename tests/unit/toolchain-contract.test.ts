@@ -21,20 +21,36 @@ function isStringRecord(value: unknown): value is Record<string, string> {
 function readManifest(): PackageManifest {
   const value: unknown = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
 
-  if (
-    typeof value !== 'object' ||
-    value === null ||
-    !('dependencies' in value) ||
-    !('devDependencies' in value) ||
-    !('scripts' in value) ||
-    !isStringRecord(value.dependencies) ||
-    !isStringRecord(value.devDependencies) ||
-    !isStringRecord(value.scripts)
-  ) {
-    throw new Error('package.json must declare dependency and script records');
+  if (typeof value !== 'object') {
+    throw new Error('package.json must be an object');
+  }
+  if (value === null) {
+    throw new Error('package.json must not be null');
+  }
+  if (!('dependencies' in value)) {
+    throw new Error('package.json must declare dependencies');
+  }
+  if (!('devDependencies' in value)) {
+    throw new Error('package.json must declare devDependencies');
+  }
+  if (!('scripts' in value)) {
+    throw new Error('package.json must declare scripts');
+  }
+  if (!isStringRecord(value.dependencies)) {
+    throw new Error('dependencies must be a string record');
+  }
+  if (!isStringRecord(value.devDependencies)) {
+    throw new Error('devDependencies must be a string record');
+  }
+  if (!isStringRecord(value.scripts)) {
+    throw new Error('scripts must be a string record');
   }
 
-  return value;
+  return {
+    dependencies: value.dependencies,
+    devDependencies: value.devDependencies,
+    scripts: value.scripts,
+  };
 }
 
 test('uses exact stable dependency pins and named validation suites', () => {

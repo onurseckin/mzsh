@@ -236,7 +236,8 @@ export function parseCatalogArgs(args: readonly string[]): CatalogParseResult {
   const values = new Map<CatalogFlag['name'], string | true>();
   const positionals: string[] = [];
   for (let index = 1; index < args.length; index += 1) {
-    const token = args[index]!;
+    const token = args[index];
+    if (token === undefined) continue;
     if (!token.startsWith('-')) {
       positionals.push(token);
       continue;
@@ -256,8 +257,8 @@ export function parseCatalogArgs(args: readonly string[]): CatalogParseResult {
       continue;
     }
     const value = args[index + 1];
-    if (value === undefined || value.startsWith('-'))
-      return { kind: 'usage-error', code: 'invalid-flags' };
+    if (value === undefined) return { kind: 'usage-error', code: 'invalid-flags' };
+    if (value.startsWith('-')) return { kind: 'usage-error', code: 'invalid-flags' };
     if (flag.value === 'absolute-path' && !isAbsolute(value))
       return { kind: 'usage-error', code: 'absolute-path-required' };
     if (flag.value === 'reviewed-plan-id' && !isReviewedPlanId(value))
@@ -282,11 +283,11 @@ export function parseCatalogArgs(args: readonly string[]): CatalogParseResult {
   const planId = values.get('plan-id');
   const confirmation = values.get('confirm');
   const json = values.has('json');
-  if (
-    (!apply && (planId !== undefined || confirmation !== undefined)) ||
-    (typeof planId !== 'undefined' && typeof planId !== 'string') ||
-    (typeof confirmation !== 'undefined' && typeof confirmation !== 'string')
-  ) {
+  const invalidApply = !apply && (planId !== undefined ? true : confirmation !== undefined);
+  const invalidPlanId = typeof planId !== 'undefined' && typeof planId !== 'string';
+  const invalidConfirmation =
+    typeof confirmation !== 'undefined' && typeof confirmation !== 'string';
+  if (invalidApply ? true : invalidPlanId ? true : invalidConfirmation) {
     return { kind: 'usage-error', code: 'invalid-flags' };
   }
   if (command.parser.kind === 'audit') {
@@ -305,12 +306,18 @@ export function parseCatalogArgs(args: readonly string[]): CatalogParseResult {
   }
   if (command.parser.kind === 'env') {
     const action = positionals[0];
-    if (action === 'list' && positionals.length === 1) return { kind: 'env', action, json };
-    if ((action === 'get' || action === 'set') && positionals.length === 2) {
-      const name = positionals[1]!;
-      return action === 'set' && json
+    if (action === 'list' && positionals.length === 1) return { kind: 'env', action: 'list', json };
+    if (action === 'get' && positionals.length === 2) {
+      const name = positionals[1];
+      if (name === undefined) return { kind: 'usage-error', code: 'unexpected-positional' };
+      return { kind: 'env', action: 'get', name, json };
+    }
+    if (action === 'set' && positionals.length === 2) {
+      const name = positionals[1];
+      if (name === undefined) return { kind: 'usage-error', code: 'unexpected-positional' };
+      return json
         ? { kind: 'usage-error', code: 'invalid-flags' }
-        : { kind: 'env', action, name, json };
+        : { kind: 'env', action: 'set', name, json };
     }
     return { kind: 'usage-error', code: 'unexpected-positional' };
   }
@@ -349,15 +356,16 @@ export function parseCatalogArgs(args: readonly string[]): CatalogParseResult {
   }
   const receiptId = positionals[0];
   if (positionals.length !== 1) return { kind: 'usage-error', code: 'unexpected-positional' };
-  return receiptId === undefined || !/^[A-Za-z0-9_-]+$/.test(receiptId)
-    ? { kind: 'usage-error', code: 'receipt-id-invalid' }
-    : {
-        kind: 'rollback',
-        receiptId,
-        apply,
-        ...(typeof planId === 'string' ? { planId } : {}),
-        ...(typeof confirmation === 'string' ? { confirmation } : {}),
-      };
+  if (receiptId === undefined) return { kind: 'usage-error', code: 'unexpected-positional' };
+  if (!/^[A-Za-z0-9_-]+$/.test(receiptId))
+    return { kind: 'usage-error', code: 'receipt-id-invalid' };
+  return {
+    kind: 'rollback',
+    receiptId,
+    apply,
+    ...(typeof planId === 'string' ? { planId } : {}),
+    ...(typeof confirmation === 'string' ? { confirmation } : {}),
+  };
 }
 
 export function renderCatalogHelp(commandName?: CatalogCommandName): string {

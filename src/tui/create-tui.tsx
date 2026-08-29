@@ -28,7 +28,10 @@ export async function runTui(dependencies: RunTuiDependencies): Promise<void> {
   registerLeader(keymap, { trigger: 'space', name: 'leader' });
   createRoot(renderer).render(
     <KeymapProvider keymap={keymap}>
-      <TuiApp catalog={dependencies.catalog ?? defaultCatalog} state={dependencies.state()} />
+      <TuiApp
+        catalog={dependencies.catalog !== undefined ? dependencies.catalog : defaultCatalog}
+        state={dependencies.state()}
+      />
     </KeymapProvider>
   );
 }

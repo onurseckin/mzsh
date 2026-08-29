@@ -80,14 +80,20 @@ function collectInventory(
   input: InventoryCollectionInput
 ): readonly InventoryRecord[] | undefined {
   try {
-    return (dependencies.inventory ?? defaultInventoryCollector()).collect(input);
+    const collector =
+      dependencies.inventory !== undefined ? dependencies.inventory : defaultInventoryCollector();
+    return collector.collect(input);
   } catch {
     return undefined;
   }
 }
 
 function isSuccess(result: AdoptionApplyResult | AdoptionRollbackResult): boolean {
-  return result.kind === 'applied' || result.kind === 'rolled-back' || result.kind === 'ready';
+  return result.kind === 'applied'
+    ? true
+    : result.kind === 'rolled-back'
+      ? true
+      : result.kind === 'ready';
 }
 
 function planSummary(plan: AdoptionPlan): object {
@@ -110,12 +116,13 @@ function planSummary(plan: AdoptionPlan): object {
     moduleOrder: plan.moduleOrder,
     receiptPath: join(plan.stateDirectory, 'receipt.json'),
     repositoryPreconditions: plan.repositoryPreconditions,
-    sensitiveAssignmentCount: plan.privateMigration?.selectedLineIndexes.length ?? 0,
+    sensitiveAssignmentCount:
+      plan.privateMigration !== undefined ? plan.privateMigration.selectedLineIndexes.length : 0,
   };
 }
 
 function reviewedPlanId(dependencies: RunMzshCliDependencies): string {
-  return (dependencies.reviewedPlanId ?? randomUUID)();
+  return (dependencies.reviewedPlanId !== undefined ? dependencies.reviewedPlanId : randomUUID)();
 }
 
 function historyDirectory(dependencies: RunMzshCliDependencies): string {
@@ -136,11 +143,13 @@ function adoptionSnapshot(plan: AdoptionPlan): ReturnType<typeof createRecoveryS
       name:
         target.category === 'loader'
           ? 'managed-loader'
-          : target.category === 'private' || target.category === 'legacy'
+          : target.category === 'private'
             ? 'managed-private'
-            : target.category === 'shims'
-              ? 'managed-shims'
-              : 'managed-current',
+            : target.category === 'legacy'
+              ? 'managed-private'
+              : target.category === 'shims'
+                ? 'managed-shims'
+                : 'managed-current',
       state: target.before.kind,
     })),
   });
@@ -179,18 +188,24 @@ export function runMzshCli(args: readonly string[], dependencies: RunMzshCliDepe
     return 0;
   }
   if (parsed.kind === 'env') return runEnvironmentCommand(parsed, dependencies);
-  if (parsed.kind === 'setup' || parsed.kind === 'update')
-    return runLifecycleCommand(parsed, dependencies);
-  const filesystem = dependencies.filesystem ?? new NodeAdoptionFilesystem();
+  if (parsed.kind === 'setup') return runLifecycleCommand(parsed, dependencies);
+  if (parsed.kind === 'update') return runLifecycleCommand(parsed, dependencies);
+  const filesystem =
+    dependencies.filesystem !== undefined ? dependencies.filesystem : new NodeAdoptionFilesystem();
   if (parsed.kind === 'audit') {
-    const repositoryRoot = parsed.source ?? dependencies.repositoryRoot;
-    const snapshot = (dependencies.probes ?? new EnvironmentProbes()).collect({
+    const repositoryRoot =
+      parsed.source !== undefined ? parsed.source : dependencies.repositoryRoot;
+    const probes =
+      dependencies.probes !== undefined ? dependencies.probes : new EnvironmentProbes();
+    const snapshot = probes.collect({
       home: dependencies.home,
       xdgConfig: dependencies.xdgConfig,
       xdgCache: dependencies.xdgCache,
       repositoryRoot,
     });
-    const report = auditEnvironment(snapshot, collectInventory(dependencies, { snapshot }) ?? []);
+    const collected = collectInventory(dependencies, { snapshot });
+    const inventory = collected !== undefined ? collected : [];
+    const report = auditEnvironment(snapshot, inventory);
     if (parsed.json) dependencies.write(JSON.stringify(report));
     else
       for (const finding of report.findings)
@@ -198,7 +213,9 @@ export function runMzshCli(args: readonly string[], dependencies: RunMzshCliDepe
     return 0;
   }
   if (parsed.kind === 'inventory') {
-    const snapshot = (dependencies.probes ?? new EnvironmentProbes()).collect({
+    const probes =
+      dependencies.probes !== undefined ? dependencies.probes : new EnvironmentProbes();
+    const snapshot = probes.collect({
       home: dependencies.home,
       xdgConfig: dependencies.xdgConfig,
       xdgCache: dependencies.xdgCache,
@@ -230,15 +247,15 @@ export function runMzshCli(args: readonly string[], dependencies: RunMzshCliDepe
       parsed.receiptId,
       'receipt.json'
     );
-    const fingerprint = (dependencies.rollbackStateDigest ?? rollbackStateDigest)(
-      { receiptPath, dryRun: true },
-      { filesystem }
-    );
+    const digestFn =
+      dependencies.rollbackStateDigest !== undefined
+        ? dependencies.rollbackStateDigest
+        : rollbackStateDigest;
+    const fingerprint = digestFn({ receiptPath, dryRun: true }, { filesystem });
+    const rollbackFn =
+      dependencies.rollback !== undefined ? dependencies.rollback : rollbackAdoption;
     if (!parsed.apply) {
-      const result = (dependencies.rollback ?? rollbackAdoption)(
-        { receiptPath, dryRun: true },
-        { filesystem }
-      );
+      const result = rollbackFn({ receiptPath, dryRun: true }, { filesystem });
       if (result.kind !== 'ready') {
         history.close();
         dependencies.write(JSON.stringify(result));
@@ -269,23 +286,12 @@ export function runMzshCli(args: readonly string[], dependencies: RunMzshCliDepe
         fingerprint,
         now: new Date(),
         snapshot: () => {
-          const verified = (dependencies.rollback ?? rollbackAdoption)(
-            { receiptPath, dryRun: true },
-            { filesystem }
-          );
+          const verified = rollbackFn({ receiptPath, dryRun: true }, { filesystem });
           if (verified.kind !== 'ready') throw new Error('ROLLBACK_SNAPSHOT_UNAVAILABLE');
           return rollbackSnapshot();
         },
-        revalidate: () =>
-          (dependencies.rollbackStateDigest ?? rollbackStateDigest)(
-            { receiptPath, dryRun: true },
-            { filesystem }
-          ) === fingerprint,
-        execute: () =>
-          (dependencies.rollback ?? rollbackAdoption)(
-            { receiptPath, dryRun: false },
-            { filesystem }
-          ),
+        revalidate: () => digestFn({ receiptPath, dryRun: true }, { filesystem }) === fingerprint,
+        execute: () => rollbackFn({ receiptPath, dryRun: false }, { filesystem }),
       });
       dependencies.write(JSON.stringify(applied));
       return isSuccess(applied) ? 0 : 1;
@@ -308,7 +314,7 @@ export function runMzshCli(args: readonly string[], dependencies: RunMzshCliDepe
     },
     {
       filesystem,
-      id: dependencies.id ?? randomUUID,
+      id: dependencies.id !== undefined ? dependencies.id : randomUUID,
       isSensitiveAssignment: classifySensitiveAssignment,
     }
   );
@@ -335,6 +341,7 @@ export function runMzshCli(args: readonly string[], dependencies: RunMzshCliDepe
     return 0;
   }
   try {
+    const applyFn = dependencies.apply !== undefined ? dependencies.apply : applyAdoption;
     const result = new ReviewedPlanApplicationService(history, history).apply({
       planId: parsed.planId,
       confirmation: parsed.confirmation,
@@ -343,10 +350,13 @@ export function runMzshCli(args: readonly string[], dependencies: RunMzshCliDepe
       now: new Date(),
       snapshot: () => adoptionSnapshot(planned.plan),
       execute: () =>
-        (dependencies.apply ?? applyAdoption)(planned.plan, {
+        applyFn(planned.plan, {
           filesystem,
-          preflight: (candidate) =>
-            (dependencies.preflight ?? new ZshPreflight()).preflight(candidate),
+          preflight: (candidate) => {
+            const preflightChecker =
+              dependencies.preflight !== undefined ? dependencies.preflight : new ZshPreflight();
+            return preflightChecker.preflight(candidate);
+          },
         }),
     });
     dependencies.write(JSON.stringify(result));

@@ -11,16 +11,15 @@ import { findExistingReviewedPlan, SqliteHistory } from '../infrastructure/histo
 import type { RunMzshCliDependencies } from './run-cli';
 
 function service(dependencies: RunMzshCliDependencies): SetupService {
-  return (
-    dependencies.setup ??
-    new SetupService({
-      home: dependencies.home,
-      repository: new LocalRepository(),
-      git: new GitClient(),
-      linker: new GlobalBunLink(),
-      shell: new ShellSetup(dependencies.home),
-    })
-  );
+  return dependencies.setup !== undefined
+    ? dependencies.setup
+    : new SetupService({
+        home: dependencies.home,
+        repository: new LocalRepository(),
+        git: new GitClient(),
+        linker: new GlobalBunLink(),
+        shell: new ShellSetup(dependencies.home),
+      });
 }
 
 function historyDirectory(dependencies: RunMzshCliDependencies): string {
@@ -28,7 +27,7 @@ function historyDirectory(dependencies: RunMzshCliDependencies): string {
 }
 
 function reviewedPlanId(dependencies: RunMzshCliDependencies): string {
-  return (dependencies.reviewedPlanId ?? randomUUID)();
+  return (dependencies.reviewedPlanId !== undefined ? dependencies.reviewedPlanId : randomUUID)();
 }
 
 function snapshot(): ReturnType<typeof createRecoverySnapshot> {
@@ -120,7 +119,7 @@ export function runLifecycleCommand(
   parsed: LifecycleCommand,
   dependencies: RunMzshCliDependencies
 ): number {
-  if (parsed.apply && (parsed.planId === undefined || parsed.confirmation !== 'APPLY'))
+  if (parsed.apply && (parsed.planId === undefined ? true : parsed.confirmation !== 'APPLY'))
     return confirmationRequired(dependencies);
   const setup = service(dependencies);
   const prepared = prepareLifecycle(parsed, setup);
@@ -143,16 +142,19 @@ export function runLifecycleCommand(
     dependencies.write(planOutput(prepared.action, prepared.operations, reviewed.id));
     return 0;
   }
+  if (parsed.planId === undefined) return confirmationRequired(dependencies);
   let existing;
   try {
-    existing = findExistingReviewedPlan(historyDirectory(dependencies), parsed.planId!);
+    existing = findExistingReviewedPlan(historyDirectory(dependencies), parsed.planId);
   } catch {
     return confirmationRequired(dependencies);
   }
   if (
-    existing === undefined ||
-    existing.action !== prepared.action ||
-    existing.fingerprint !== fingerprint
+    existing === undefined
+      ? true
+      : existing.action !== prepared.action
+        ? true
+        : existing.fingerprint !== fingerprint
   ) {
     return confirmationRequired(dependencies);
   }
