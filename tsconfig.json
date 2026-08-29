@@ -5,6 +5,7 @@
     "module": "Preserve",
     "moduleDetection": "auto",
     "allowJs": true,
+    "rootDir": ".",
     "outDir": "./lib",
     "moduleResolution": "bundler",
     "types": ["bun"],
@@ -24,6 +25,6 @@
     "noUnusedParameters": false,
     "noPropertyAccessFromIndexSignature": false
   },
-  "include": ["src/**/*", "src/**/*.tsx", "tests/**/*"],
+  "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "lib"]
 }
