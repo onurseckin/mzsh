@@ -31,7 +31,7 @@ typeset -a mzsh_init_owned_functions=(
   _mzsh_dburl_decode _mzsh_dburl_sensitive_key dburl _mzsh_ports_kill kk kka
 )
 typeset -a mzsh_init_style_contexts=(
-  ':omz:plugins:ssh-agent' ':omz:plugins:ssh-agent' ':omz:plugins:ssh-agent'
+  ':omz:plugins:ssh-agent' ':omz:plugins:ssh-agent' ':omz:plugins:ssh-agent' ':omz:plugins:ssh-agent'
   ':completion:*:git-checkout:*' ':completion:*:descriptions'
   ':fzf-tab:complete:(cd|z|ls|eza):*'
   ':fzf-tab:complete:(-command-|-parameter-|-brace-parameter-|export|unset|expand):*'
@@ -39,7 +39,7 @@ typeset -a mzsh_init_style_contexts=(
   ':fzf-tab:*' ':fzf-tab:*'
 )
 typeset -a mzsh_init_style_names=(
-  identities lifetime lazy
+  identities lifetime lazy quiet
   sort format
   fzf-preview fzf-preview fzf-preview fzf-preview
   switch-group fzf-flags
