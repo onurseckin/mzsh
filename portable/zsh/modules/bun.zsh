@@ -1,3 +1,4 @@
-# Bun's documented install root is portable across user accounts.
-[[ -n ${BUN_INSTALL:-} ]] && mzsh_path_add_application "$BUN_INSTALL/bin"
+typeset mzsh_bun_install="${BUN_INSTALL:-$HOME/.bun}"
+mzsh_path_add_application "$mzsh_bun_install/bin"
+unset mzsh_bun_install
 return 0

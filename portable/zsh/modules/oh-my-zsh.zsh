@@ -8,6 +8,9 @@ typeset mzsh_omz_root="${MZSH_OH_MY_ZSH_ROOT:-$HOME/.oh-my-zsh}"
 [[ -r $mzsh_omz_root/oh-my-zsh.sh ]] || { unset mzsh_module_directory mzsh_omz_root; return 0; }
 
 export ZSH="$mzsh_omz_root"
+typeset mzsh_cache_root="${XDG_CACHE_HOME:-$HOME/.cache}/mzsh"
+(umask 077 && command mkdir -p "$mzsh_cache_root")
+export ZSH_COMPDUMP="$mzsh_cache_root/zcompdump-${ZSH_VERSION}"
 typeset -g ZSH_THEME="${MZSH_OH_MY_ZSH_THEME:-powerlevel10k/powerlevel10k}"
 zstyle :omz:plugins:ssh-agent identities id_rsa id_ed25519
 zstyle :omz:plugins:ssh-agent lifetime 24h
