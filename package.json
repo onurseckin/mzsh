@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": false,
   "bin": {
+    "agyp": "./bin/agyp.ts",
     "mzsh": "./bin/run-standalone.ts"
   },
   "type": "commonjs",

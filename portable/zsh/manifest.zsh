@@ -24,6 +24,7 @@ typeset -a mzsh_framework_modules=(
   history
   dburl
   ports-manager
+  agyp
   private
 )
 

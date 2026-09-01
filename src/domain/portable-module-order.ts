@@ -18,6 +18,7 @@ export const PORTABLE_INTERACTIVE_MODULE_ORDER = [
   'history',
   'dburl',
   'ports-manager',
+  'agyp',
   'private',
 ] as const;
 
