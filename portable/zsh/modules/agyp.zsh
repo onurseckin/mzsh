@@ -34,10 +34,21 @@ function agyp() {
 }
 
 function agy() {
+  # Sanitize terminal line discipline against flow-control lockups and delayed suspend signals
+  stty -ixon -ixoff dsusp undef 2>/dev/null || true
+
+  # Ignore background terminal I/O signals
+  trap -- '' TTOU TTIN 2>/dev/null || true
+
+  local target_token=""
   if [[ -n "${JETSKI_STANDALONE_OAUTH_TOKEN_PATH:-}" && -f "$JETSKI_STANDALONE_OAUTH_TOKEN_PATH" ]]; then
-    command agy "$@"
+    target_token="$JETSKI_STANDALONE_OAUTH_TOKEN_PATH"
   elif [[ -n "${AGY_ACCOUNT:-}" && -f "$HOME/.gemini/accounts/$AGY_ACCOUNT/jetski-standalone-oauth-token" ]]; then
-    JETSKI_STANDALONE_OAUTH_TOKEN_PATH="$HOME/.gemini/accounts/$AGY_ACCOUNT/jetski-standalone-oauth-token" command agy "$@"
+    target_token="$HOME/.gemini/accounts/$AGY_ACCOUNT/jetski-standalone-oauth-token"
+  fi
+
+  if [[ -n "$target_token" ]]; then
+    JETSKI_STANDALONE_OAUTH_TOKEN_PATH="$target_token" command agy "$@"
   else
     command agy "$@"
   fi
