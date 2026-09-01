@@ -11,6 +11,7 @@ alias vim='nvim'
 alias vi='nvim'
 alias tldrconfig='nvim "$HOME/Library/Application Support/tealdeer/config.toml"'
 alias h='history -i -r 1 | less'
+alias reap='reap-zombies'
 
 function n() {
   if (( $# == 0 )); then
