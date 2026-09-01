@@ -53,6 +53,9 @@ function agyp() {
 }
 
 function agy() {
+  # Sanitize terminal line discipline against flow-control lockups (Ctrl-S/Q) and delayed suspend (Ctrl-Y)
+  stty -ixon -ixoff -tostop dsusp undef 2>/dev/null || true
+
   local target_token=""
   if [[ -n "${JETSKI_STANDALONE_OAUTH_TOKEN_PATH:-}" && "$JETSKI_STANDALONE_OAUTH_TOKEN_PATH" == "$HOME"/* && -f "$JETSKI_STANDALONE_OAUTH_TOKEN_PATH" ]]; then
     target_token="$JETSKI_STANDALONE_OAUTH_TOKEN_PATH"

@@ -8,5 +8,8 @@ unset mzsh_shim_directory
 # during high-speed voice dictation bursts or piped command pipelines.
 trap -- '' PIPE 2>/dev/null || trap '' PIPE 2>/dev/null || true
 
+# Prevent accidental shell termination on EOF / Ctrl+D bursts from dictation or synthetic keystrokes
+setopt ignore_eof 2>/dev/null || true
+
 return 0
 
