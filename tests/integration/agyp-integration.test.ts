@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { chmodSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { AgypVault } from '../../src/domain/agyp/agyp-vault';
 import { AgypService } from '../../src/infrastructure/agyp/agyp-service';
@@ -60,5 +61,60 @@ describe('agyp multi-account integration', () => {
     const currentResult = service.currentAccount();
     expect(currentResult.success).toBeTrue();
     expect(currentResult.payload).toBe('onurssenoglu@gmail.com');
+  });
+
+  test('end-to-end zsh shell session integration and agy delegation', () => {
+    const fakeHome = join(testRoot, 'home');
+    const fakeGemini = join(fakeHome, '.gemini');
+    const fakeAccountsDir = join(fakeGemini, 'accounts');
+    const fakeLocalBin = join(fakeHome, '.local', 'bin');
+    mkdirSync(fakeAccountsDir, { recursive: true, mode: 0o700 });
+    mkdirSync(fakeLocalBin, { recursive: true, mode: 0o700 });
+
+    const vault = new AgypVault(fakeAccountsDir, fakeGemini);
+    vault.addOrUpdateAccount('alice.work@corp.com', 'alice-token');
+    vault.addOrUpdateAccount('bob.personal@gmail.com', 'bob-token');
+    vault.setActiveAccount('alice.work@corp.com');
+
+    const mockAgy = join(fakeLocalBin, 'agy');
+    writeFileSync(
+      mockAgy,
+      '#!/bin/sh\nprintf "MOCK_AGY_TOKEN:%s\\n" "$JETSKI_STANDALONE_OAUTH_TOKEN_PATH"\n',
+      { mode: 0o755 }
+    );
+    chmodSync(mockAgy, 0o755);
+
+    const agypZshModule = join(process.cwd(), 'portable', 'zsh', 'modules', 'agyp.zsh');
+
+    const zshScript = `
+export HOME="${fakeHome}"
+export PATH="${fakeLocalBin}:$PATH"
+source "${agypZshModule}"
+
+# Verify active account routing before switch
+agy
+
+# Switch to bob via fuzzy prefix
+agyp bob
+
+# Print exported shell state and call agy again
+printf "EXPORTED_AGY_ACCOUNT:%s\\n" "$AGY_ACCOUNT"
+agy
+`;
+
+    const res = spawnSync('zsh', ['-f', '-i', '-c', zshScript], {
+      env: {
+        ...process.env,
+        HOME: fakeHome,
+        PATH: `${fakeLocalBin}:${process.env.PATH}`,
+      },
+      encoding: 'utf8',
+    });
+
+    expect(res.status).toBe(0);
+    expect(res.stdout).toContain('MOCK_AGY_TOKEN:' + vault.getTokenPath('alice.work@corp.com'));
+    expect(res.stdout).toContain('bob.personal@gmail.com');
+    expect(res.stdout).toContain('EXPORTED_AGY_ACCOUNT:bob.personal@gmail.com');
+    expect(res.stdout).toContain('MOCK_AGY_TOKEN:' + vault.getTokenPath('bob.personal@gmail.com'));
   });
 });

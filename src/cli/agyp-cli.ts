@@ -49,7 +49,18 @@ export class AgypCli {
       }
       case 'login': {
         const targetEmail = argv[1];
-        const result = this.service.stageLogin(targetEmail);
+        const result = await this.service.loginAccount(targetEmail);
+        return this.handleResult(result);
+      }
+      case 'add':
+      case 'import': {
+        const email = argv[1];
+        const token = argv[2];
+        if (!email || !token) {
+          console.error('Usage: agyp add <email> <token-content>');
+          return 1;
+        }
+        const result = this.service.addAccount(email, token);
         return this.handleResult(result);
       }
       case 'help':
@@ -59,9 +70,12 @@ export class AgypCli {
         return 0;
       }
       default: {
-        // If argument looks like an email, treat as `agyp use <email>`
-        if (command.includes('@')) {
-          const result = await this.service.pickOrSwitch(command);
+        const result = await this.service.pickOrSwitch(command);
+        if (
+          result.success ||
+          result.message?.includes('Ambiguous') ||
+          (result.message?.includes('not found') && command.includes('@'))
+        ) {
           return this.handleResult(result);
         }
         console.error(`Unknown agyp command: "${command}"`);
@@ -95,13 +109,19 @@ export class AgypCli {
 agyp - Antigravity Multi-Account Switcher & Environment Manager
 
 Usage:
-  agyp                  Interactive terminal UI to select active account
-  agyp use <email>      Switch active shell account to specified email
-  agyp list             List all registered accounts
-  agyp current          Print the currently active account
-  agyp login [email]    Stage a new account login directory
-  agyp logout <email>   Remove an account from the multi-account vault
-  agyp help             Show this help message
+  agyp                         Interactive terminal UI to select or add accounts
+  agyp <prefix|email>          Quickly switch active account via fuzzy match (e.g. \`agyp work\`)
+  agyp login [email]           Launch browser login for a new account without overwriting existing
+  agyp add <email> <token>     Directly register an existing token in the vault
+  agyp use <prefix|email>      Switch active shell account to matching email
+  agyp list                    List all registered accounts with active marker
+  agyp current                 Print the currently active account
+  agyp logout <prefix|email>   Remove an account and automatically re-sync shell environment
+  agyp help                    Show this help message
+
+Notes:
+  - Account selection via \`agyp\` exports AGY_ACCOUNT and token paths into your shell session.
+  - The \`agy\` command automatically routes to the active account across new tabs and tmux panes.
 `);
   }
 }

@@ -39,3 +39,5 @@ export interface AgypResult {
   action?: 'export' | 'print' | 'none';
   payload?: string;
 }
+
+export type AgypAuthExecutor = (stagingTokenPath: string) => boolean | Promise<boolean>;

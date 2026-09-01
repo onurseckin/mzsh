@@ -27,13 +27,26 @@ function agyp() {
   fi
   local exit_code=$?
 
-  if (( exit_code == 0 )) && [[ "$cmd_output" == export* ]]; then
-    eval "$cmd_output"
-    if [[ -n "${AGY_ACCOUNT:-}" ]]; then
-      print -- "\x1b[1;32m✓\x1b[0m Switched active Antigravity account to \x1b[1;37m$AGY_ACCOUNT\x1b[0m"
+  if (( exit_code == 0 )); then
+    if [[ "$cmd_output" == *"export AGY_ACCOUNT="* || "$cmd_output" == *"unset AGY_ACCOUNT"* ]]; then
+      local line
+      while IFS= read -r line; do
+        if [[ "$line" == export\ * || "$line" == unset\ * ]]; then
+          eval "$line"
+        elif [[ -n "$line" ]]; then
+          print -- "$line"
+        fi
+      done <<< "$cmd_output"
+      if [[ -n "${AGY_ACCOUNT:-}" ]]; then
+        print -- "\x1b[1;32m✓\x1b[0m Active Antigravity account is \x1b[1;37m$AGY_ACCOUNT\x1b[0m"
+      elif [[ "$cmd_output" == *"unset AGY_ACCOUNT"* ]]; then
+        print -- "\x1b[1;33mℹ\x1b[0m Cleared active Antigravity account"
+      fi
+    elif [[ -n "$cmd_output" ]]; then
+      print -- "$cmd_output"
     fi
   elif [[ -n "$cmd_output" ]]; then
-    printf '%s\n' "$cmd_output"
+    print -u2 -- "$cmd_output"
   fi
 
   return $exit_code
@@ -45,6 +58,12 @@ function agy() {
     target_token="$JETSKI_STANDALONE_OAUTH_TOKEN_PATH"
   elif [[ -n "${AGY_ACCOUNT:-}" && -f "$HOME/.gemini/accounts/$AGY_ACCOUNT/jetski-standalone-oauth-token" ]]; then
     target_token="$HOME/.gemini/accounts/$AGY_ACCOUNT/jetski-standalone-oauth-token"
+  elif [[ -f "$HOME/.gemini/accounts/registry.json" ]]; then
+    local active_acc=""
+    active_acc=$(grep -o '"activeAccount"[[:space:]]*:[[:space:]]*"[^"]*"' "$HOME/.gemini/accounts/registry.json" 2>/dev/null | sed -E 's/.*"([^"]+)"$/\1/')
+    if [[ -n "$active_acc" && "$active_acc" != "null" && -f "$HOME/.gemini/accounts/$active_acc/jetski-standalone-oauth-token" ]]; then
+      target_token="$HOME/.gemini/accounts/$active_acc/jetski-standalone-oauth-token"
+    fi
   fi
 
   if [[ -n "$target_token" ]]; then
