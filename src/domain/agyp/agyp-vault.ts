@@ -80,7 +80,7 @@ export class AgypVault {
     try {
       const accountsJson = readFileSync(globalAccounts, 'utf8');
       const parsed = JSON.parse(accountsJson) as unknown as GoogleAccountsPayload;
-      const email = parsed.primaryEmail ?? parsed.accounts?.[0]?.email;
+      const email = parsed.active ?? parsed.primaryEmail ?? parsed.accounts?.[0]?.email;
       if (!email || typeof email !== 'string') {
         return false;
       }

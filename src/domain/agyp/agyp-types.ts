@@ -21,8 +21,10 @@ export interface GoogleAccountProfile {
 }
 
 export interface GoogleAccountsPayload {
-  accounts?: GoogleAccountProfile[];
+  active?: string;
   primaryEmail?: string;
+  accounts?: GoogleAccountProfile[];
+  old?: string[];
 }
 
 export interface AgypEnvironmentExport {

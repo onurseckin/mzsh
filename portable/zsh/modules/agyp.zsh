@@ -4,12 +4,14 @@
 function agyp() {
   local agyp_bin=""
   
-  if command -v agyp >/dev/null 2>&1; then
-    agyp_bin="$(which agyp 2>/dev/null)"
-  elif [[ -f "$HOME/.local/bin/agyp" ]]; then
-    agyp_bin="$HOME/.local/bin/agyp"
-  elif [[ -f "${0:A:h}/../../../bin/agyp.ts" ]]; then
-    agyp_bin="${0:A:h}/../../../bin/agyp.ts"
+  agyp_bin="$(whence -p agyp 2>/dev/null)"
+
+  if [[ -z "$agyp_bin" || ! -f "$agyp_bin" ]]; then
+    if [[ -f "$HOME/.local/bin/agyp" ]]; then
+      agyp_bin="$HOME/.local/bin/agyp"
+    elif [[ -f "${0:A:h}/../../../bin/agyp.ts" ]]; then
+      agyp_bin="${0:A:h}/../../../bin/agyp.ts"
+    fi
   fi
 
   if [[ -z "$agyp_bin" || ! -f "$agyp_bin" ]]; then
@@ -18,7 +20,11 @@ function agyp() {
   fi
 
   local cmd_output
-  cmd_output=$(bun "$agyp_bin" "$@")
+  if [[ "$agyp_bin" == *.ts ]]; then
+    cmd_output=$(bun "$agyp_bin" "$@")
+  else
+    cmd_output=$("$agyp_bin" "$@")
+  fi
   local exit_code=$?
 
   if (( exit_code == 0 )) && [[ "$cmd_output" == export* ]]; then
