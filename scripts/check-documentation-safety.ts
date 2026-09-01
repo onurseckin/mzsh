@@ -4,7 +4,12 @@ import { extname, join, relative, resolve } from 'node:path';
 const repoRoot = resolve(__dirname, '..');
 
 const scanDirectories = ['docs', 'manifests'];
-const scanFiles = ['README.md', 'portable/zsh/README.md'];
+const scanFiles = [
+  'README.md',
+  'portable/zsh/README.md',
+  'portable/tmux/README.md',
+  'portable/wezterm/README.md',
+];
 
 const sensitivePatterns: Array<{ name: string; pattern: RegExp }> = [
   { name: 'hardcoded-personal-user-path', pattern: /\/Users\/[a-z0-9_.-]+(?!\/\.{2})/i },

@@ -10,6 +10,10 @@ for tool in zsh shfmt shellcheck; do
 done
 
 find portable/zsh -type f -name '*.zsh' -exec zsh -n {} +
+test -f portable/tmux/.tmux.conf || {
+  printf 'mzsh quality gate requires portable/tmux/.tmux.conf\n' >&2
+  exit 1
+}
 
 shfmt -ln=posix -d portable/zsh/shims/shim-runner
 shfmt -ln=bash -d portable/zsh/shims/check-prohibited

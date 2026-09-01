@@ -37,6 +37,8 @@ coverage/
 # Temporary folders
 tmp/
 temp/
+.fixtures/
+tests/**/.fixtures/
 
 # OLT runtime capsules
 .olt/capsules/

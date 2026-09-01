@@ -31,7 +31,20 @@ export interface BunLinkProcess {
 
 class NativeBunLinkProcess implements BunLinkProcess {
   run(root: string): number {
-    return spawnSync('bun', ['link'], { cwd: root, shell: false, stdio: 'ignore' }).status ?? 1;
+    const result = spawnSync('bun', ['link'], {
+      cwd: root,
+      shell: false,
+      stdio: 'ignore',
+      env: {
+        ...process.env,
+        HOME: process.env.HOME || process.env.TMPDIR || '/tmp',
+      },
+    });
+    const status = result.status;
+    if (typeof status === 'number') {
+      return status;
+    }
+    return 1;
   }
 }
 
@@ -97,11 +110,14 @@ export class ShellSetup implements ShellReconciler {
     if (state.kind === 'absent') return undefined;
     if (state.kind !== 'file') throw new Error('SHELL_LOADER_UNSAFE');
     const currentUser = this.filesystem.currentUserId();
-    if (
-      currentUser === undefined ||
-      state.ownerId !== currentUser ||
-      ((state.mode ?? 0) & 0o077) !== 0
-    ) {
+    if (currentUser === undefined) {
+      throw new Error('SHELL_LOADER_UNSAFE');
+    }
+    if (state.ownerId !== currentUser) {
+      throw new Error('SHELL_LOADER_UNSAFE');
+    }
+    const mode = typeof state.mode === 'number' ? state.mode : 0;
+    if ((mode & 0o077) !== 0) {
       throw new Error('SHELL_LOADER_UNSAFE');
     }
     const snapshot = this.filesystem.readRegularUtf8NoFollow(path);

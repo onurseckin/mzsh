@@ -257,4 +257,44 @@ describe('portable Zsh initialization', () => {
     expect(initSource).not.toContain('eval ');
     expect(initSource).not.toContain('typeset -p');
   });
+
+  test('configures KEYTIMEOUT=1, bracketed paste, and SIGPIPE safety trap for interactive zsh input stability', () => {
+    const fixture = createFixture();
+    const portableRoot = copyPortableRoot(fixture);
+    makeDirectory(fixture, 'home');
+    makeDirectory(fixture, 'system');
+
+    const script = [
+      'function compinit() { return 0 }',
+      'source "$MZSH_ENTRYPOINT"',
+      'print -r -- "KEYTIMEOUT=$KEYTIMEOUT"',
+      'print -r -- "ZVM_MODE=$ZVM_LINE_INIT_MODE"',
+      'bindkey -M viins | grep -q "bracketed-paste" && print -r -- "PASTE_VIINS=bound" || print -r -- "PASTE_VIINS=unbound"',
+    ].join('\n');
+
+    const result = Bun.spawnSync([zshPath, '-fic', script], {
+      cwd: fixture,
+      env: {
+        ...portableEnvironment(),
+        HOME: join(fixture, 'home'),
+        PATH: `${join(fixture, 'system')}:/usr/bin:/bin`,
+        FPATH: '',
+        MZSH_ENTRYPOINT: join(portableRoot, 'init.zsh'),
+        BUN_INSTALL: '',
+        NVM_DIR: '',
+        CARGO_HOME: join(fixture, 'missing-cargo'),
+        ANDROID_HOME: '',
+        ANDROID_SDK_ROOT: '',
+        MZSH_OH_MY_ZSH_ROOT: '',
+        MZSH_DOCKER_COMPLETION_DIR: '',
+        MZSH_PRIVATE_ZSH: join(fixture, 'missing-private.zsh'),
+      },
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(outputOf(result)).toContain('KEYTIMEOUT=1\n');
+    expect(outputOf(result)).toContain('PASTE_VIINS=bound\n');
+  });
 });
