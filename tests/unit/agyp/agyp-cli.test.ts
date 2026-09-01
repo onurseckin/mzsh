@@ -123,6 +123,27 @@ describe('AgypCli', () => {
     expect(stagingDirs).toHaveLength(0);
   });
 
+  test('discovers email automatically from google_accounts and oauth_creds in login flow', async () => {
+    const result = await service.loginAccount(undefined, (tokenPath) => {
+      writeFileSync(tokenPath, 'token-from-browser');
+      const stagingGemini = join(tokenPath, '..');
+      writeFileSync(
+        join(stagingGemini, 'google_accounts.json'),
+        JSON.stringify({ active: 'discovered@example.com' })
+      );
+      writeFileSync(
+        join(stagingGemini, 'oauth_creds.json'),
+        JSON.stringify({ email: 'discovered@example.com', access_token: 'discovered-token' })
+      );
+      return true;
+    });
+
+    expect(result.success).toBeTrue();
+    expect(vault.getActiveAccount()).toBe('discovered@example.com');
+    expect(vault.listAccounts()).toHaveLength(1);
+    expect(vault.listAccounts()[0]?.email).toBe('discovered@example.com');
+  });
+
   test('switches accounts using fuzzy prefix or direct command', async () => {
     mkdirSync(vault.getAccountDir('primary.user@corp.com'), { recursive: true });
     writeFileSync(vault.getTokenPath('primary.user@corp.com'), 'primary-token');

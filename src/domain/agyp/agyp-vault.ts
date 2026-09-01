@@ -16,13 +16,17 @@ import type {
   AgypEnvironmentExport,
   GoogleAccountsPayload,
 } from './agyp-types';
+import { extractEmailFromJwt, extractEmailFromToken } from './agyp-token-parser';
+import { matchAccount } from './agyp-matcher';
 
 export class AgypVault {
   private readonly vaultRoot: string;
   private readonly globalGeminiDir: string;
 
   constructor(customVaultDir?: string, customGeminiDir?: string) {
-    this.globalGeminiDir = customGeminiDir ?? join(homedir(), '.gemini');
+    const home =
+      process.env.HOME && process.env.HOME.trim().length > 0 ? process.env.HOME : homedir();
+    this.globalGeminiDir = customGeminiDir ?? join(home, '.gemini');
     this.vaultRoot = customVaultDir ?? join(this.globalGeminiDir, 'accounts');
   }
 
@@ -103,49 +107,51 @@ export class AgypVault {
   }
 
   public extractEmailFromJwt(jwtString: string): string | null {
-    const parts = jwtString.trim().split('.');
-    if (parts.length >= 2 && parts[1]) {
-      try {
-        const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-        const jsonStr = Buffer.from(base64, 'base64').toString('utf8');
-        const payload = JSON.parse(jsonStr) as Record<string, unknown>;
-        if (typeof payload.email === 'string' && payload.email.includes('@')) {
-          return payload.email;
-        }
-        if (typeof payload.sub === 'string' && payload.sub.includes('@')) {
-          return payload.sub;
-        }
-      } catch {
-        // Ignore JWT parse error
-      }
-    }
-    return null;
+    return extractEmailFromJwt(jwtString);
   }
 
   public extractEmailFromToken(token: string): string | null {
-    const trimmed = token.trim();
-    try {
-      const parsed = JSON.parse(trimmed) as Record<string, unknown>;
-      if (typeof parsed.email === 'string' && parsed.email.includes('@')) {
-        return parsed.email;
-      }
-      if (typeof parsed.id_token === 'string') {
-        const email = this.extractEmailFromJwt(parsed.id_token);
-        if (email) return email;
-      }
-      if (typeof parsed.access_token === 'string') {
-        const email = this.extractEmailFromJwt(parsed.access_token);
-        if (email) return email;
-      }
-    } catch {
-      // Not JSON payload
+    return extractEmailFromToken(token);
+  }
+
+  public syncActiveToGeminiDir(email: string): void {
+    const canonicalEmail = this.canonicalizeEmail(email);
+    const accountDir = this.getAccountDir(canonicalEmail);
+    if (!existsSync(accountDir)) {
+      return;
     }
-    return this.extractEmailFromJwt(trimmed);
+
+    if (!existsSync(this.globalGeminiDir)) {
+      mkdirSync(this.globalGeminiDir, { recursive: true, mode: 0o700 });
+      chmodSync(this.globalGeminiDir, 0o700);
+    }
+
+    const tokenPath = this.getTokenPath(canonicalEmail);
+    if (existsSync(tokenPath)) {
+      const globalToken = join(this.globalGeminiDir, 'jetski-standalone-oauth-token');
+      copyFileSync(tokenPath, globalToken);
+      chmodSync(globalToken, 0o600);
+    }
+
+    const accPath = join(accountDir, 'google_accounts.json');
+    if (existsSync(accPath)) {
+      const globalAccounts = join(this.globalGeminiDir, 'google_accounts.json');
+      copyFileSync(accPath, globalAccounts);
+      chmodSync(globalAccounts, 0o600);
+    }
+
+    const oauthPath = join(accountDir, 'oauth_creds.json');
+    if (existsSync(oauthPath)) {
+      const globalOauth = join(this.globalGeminiDir, 'oauth_creds.json');
+      copyFileSync(oauthPath, globalOauth);
+      chmodSync(globalOauth, 0o600);
+    }
   }
 
   public autoImportExistingToken(): boolean {
     const globalToken = join(this.globalGeminiDir, 'jetski-standalone-oauth-token');
     const globalAccounts = join(this.globalGeminiDir, 'google_accounts.json');
+    const globalOauth = join(this.globalGeminiDir, 'oauth_creds.json');
 
     if (!existsSync(globalToken)) {
       return false;
@@ -153,8 +159,21 @@ export class AgypVault {
 
     try {
       const tokenContent = readFileSync(globalToken, 'utf8');
+      const cleanToken = tokenContent.trim();
+      const registry = this.readRegistry();
+
+      // Check if global token content already belongs to an existing account in registry
+      const existingMatch = registry.accounts.find((a) => {
+        const p = this.getTokenPath(a.email);
+        return existsSync(p) && readFileSync(p, 'utf8').trim() === cleanToken;
+      });
+      if (existingMatch) {
+        return true;
+      }
+
       let email: string | null = null;
       let accountsJson: string | null = null;
+      let oauthJson: string | null = null;
 
       if (existsSync(globalAccounts)) {
         try {
@@ -163,6 +182,22 @@ export class AgypVault {
           const candidate = parsed.active ?? parsed.primaryEmail ?? parsed.accounts?.[0]?.email;
           if (typeof candidate === 'string' && candidate.trim().length > 0) {
             email = candidate.trim();
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      if (existsSync(globalOauth)) {
+        try {
+          oauthJson = readFileSync(globalOauth, 'utf8');
+          if (!email) {
+            const parsed = JSON.parse(oauthJson) as { email?: string; id_token?: string };
+            if (typeof parsed.email === 'string' && parsed.email.includes('@')) {
+              email = parsed.email.trim();
+            } else if (typeof parsed.id_token === 'string') {
+              email = this.extractEmailFromJwt(parsed.id_token);
+            }
           }
         } catch {
           // ignore
@@ -178,8 +213,6 @@ export class AgypVault {
       }
 
       const canonicalEmail = this.canonicalizeEmail(email);
-      const cleanToken = tokenContent.trim();
-      const registry = this.readRegistry();
       const existing = registry.accounts.find((a) => a.email === canonicalEmail);
       const targetTokenPath = this.getTokenPath(canonicalEmail);
       const accountDir = this.getAccountDir(canonicalEmail);
@@ -203,6 +236,11 @@ export class AgypVault {
         const accPath = join(accountDir, 'google_accounts.json');
         writeFileSync(accPath, accountsJson, { mode: 0o600 });
         chmodSync(accPath, 0o600);
+      }
+      if (oauthJson) {
+        const oPath = join(accountDir, 'oauth_creds.json');
+        writeFileSync(oPath, oauthJson, { mode: 0o600 });
+        chmodSync(oPath, 0o600);
       }
 
       if (!existing) {
@@ -246,13 +284,15 @@ export class AgypVault {
     account.lastUsedAt = new Date().toISOString();
     registry.activeAccount = canonicalEmail;
     this.writeRegistry(registry);
+    this.syncActiveToGeminiDir(canonicalEmail);
     return true;
   }
 
   public addOrUpdateAccount(
     email: string,
     tokenContent: string,
-    googleAccountsContent?: string
+    googleAccountsContent?: string,
+    oauthCredsContent?: string
   ): boolean {
     const canonicalEmail = this.canonicalizeEmail(email);
     const cleanToken = tokenContent.trim();
@@ -270,6 +310,12 @@ export class AgypVault {
     writeFileSync(accPath, accountsData, { mode: 0o600 });
     chmodSync(accPath, 0o600);
 
+    if (oauthCredsContent) {
+      const oauthPath = join(accountDir, 'oauth_creds.json');
+      writeFileSync(oauthPath, oauthCredsContent.trim(), { mode: 0o600 });
+      chmodSync(oauthPath, 0o600);
+    }
+
     const registry = this.readRegistry();
     const existing = registry.accounts.find((a) => a.email === canonicalEmail);
     const now = new Date().toISOString();
@@ -284,6 +330,7 @@ export class AgypVault {
     }
     registry.activeAccount = canonicalEmail;
     this.writeRegistry(registry);
+    this.syncActiveToGeminiDir(canonicalEmail);
     return true;
   }
 
@@ -294,8 +341,9 @@ export class AgypVault {
     if (index === -1) {
       return false;
     }
+    const wasActive = registry.activeAccount === canonicalEmail;
     registry.accounts.splice(index, 1);
-    if (registry.activeAccount === canonicalEmail) {
+    if (wasActive) {
       registry.activeAccount = registry.accounts[0]?.email ?? null;
     }
     this.writeRegistry(registry);
@@ -304,6 +352,20 @@ export class AgypVault {
     if (existsSync(accountDir)) {
       rmSync(accountDir, { recursive: true, force: true });
     }
+
+    if (wasActive) {
+      if (registry.activeAccount) {
+        this.syncActiveToGeminiDir(registry.activeAccount);
+      } else {
+        const globalToken = join(this.globalGeminiDir, 'jetski-standalone-oauth-token');
+        const globalAccounts = join(this.globalGeminiDir, 'google_accounts.json');
+        const globalOauth = join(this.globalGeminiDir, 'oauth_creds.json');
+        if (existsSync(globalToken)) rmSync(globalToken, { force: true });
+        if (existsSync(globalAccounts)) rmSync(globalAccounts, { force: true });
+        if (existsSync(globalOauth)) rmSync(globalOauth, { force: true });
+      }
+    }
+
     return true;
   }
 
@@ -329,53 +391,6 @@ export class AgypVault {
   public findAccount(query: string): { account: AccountMetadata | null; error?: string } {
     this.autoImportExistingToken();
     const registry = this.readRegistry();
-    const cleanQuery = query.trim().toLowerCase();
-
-    if (!cleanQuery) {
-      return { account: null, error: 'Empty account query specified.' };
-    }
-
-    // 1. Exact match
-    const exact = registry.accounts.find((a) => a.email.toLowerCase() === cleanQuery);
-    if (exact) {
-      return { account: exact };
-    }
-
-    // 2. Prefix match
-    const prefixMatches = registry.accounts.filter((a) =>
-      a.email.toLowerCase().startsWith(cleanQuery)
-    );
-    if (prefixMatches.length === 1 && prefixMatches[0]) {
-      return { account: prefixMatches[0] };
-    }
-
-    // 3. Substring match
-    const substringMatches = registry.accounts.filter((a) =>
-      a.email.toLowerCase().includes(cleanQuery)
-    );
-    if (substringMatches.length === 1 && substringMatches[0]) {
-      return { account: substringMatches[0] };
-    }
-
-    if (prefixMatches.length > 1) {
-      const candidates = prefixMatches.map((a) => a.email).join(', ');
-      return {
-        account: null,
-        error: `Ambiguous account query "${query}". Multiple matches found: ${candidates}`,
-      };
-    }
-
-    if (substringMatches.length > 1) {
-      const candidates = substringMatches.map((a) => a.email).join(', ');
-      return {
-        account: null,
-        error: `Ambiguous account query "${query}". Multiple matches found: ${candidates}`,
-      };
-    }
-
-    return {
-      account: null,
-      error: `Account "${query}" not found in vault.`,
-    };
+    return matchAccount(registry.accounts, query);
   }
 }

@@ -54,7 +54,7 @@ function agyp() {
 
 function agy() {
   local target_token=""
-  if [[ -n "${JETSKI_STANDALONE_OAUTH_TOKEN_PATH:-}" && -f "$JETSKI_STANDALONE_OAUTH_TOKEN_PATH" ]]; then
+  if [[ -n "${JETSKI_STANDALONE_OAUTH_TOKEN_PATH:-}" && "$JETSKI_STANDALONE_OAUTH_TOKEN_PATH" == "$HOME"/* && -f "$JETSKI_STANDALONE_OAUTH_TOKEN_PATH" ]]; then
     target_token="$JETSKI_STANDALONE_OAUTH_TOKEN_PATH"
   elif [[ -n "${AGY_ACCOUNT:-}" && -f "$HOME/.gemini/accounts/$AGY_ACCOUNT/jetski-standalone-oauth-token" ]]; then
     target_token="$HOME/.gemini/accounts/$AGY_ACCOUNT/jetski-standalone-oauth-token"
@@ -64,6 +64,8 @@ function agy() {
     if [[ -n "$active_acc" && "$active_acc" != "null" && -f "$HOME/.gemini/accounts/$active_acc/jetski-standalone-oauth-token" ]]; then
       target_token="$HOME/.gemini/accounts/$active_acc/jetski-standalone-oauth-token"
     fi
+  elif [[ -f "$HOME/.gemini/jetski-standalone-oauth-token" ]]; then
+    target_token="$HOME/.gemini/jetski-standalone-oauth-token"
   fi
 
   if [[ -n "$target_token" ]]; then

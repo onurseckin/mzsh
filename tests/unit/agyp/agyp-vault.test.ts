@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { AgypVault } from '../../../src/domain/agyp/agyp-vault';
 
@@ -224,5 +224,43 @@ describe('AgypVault', () => {
     // Switch using different casing
     const switched = vault.setActiveAccount('USER.NAME@EXAMPLE.COM');
     expect(switched).toBeTrue();
+  });
+
+  test('syncs active account token, google_accounts and oauth_creds to global gemini dir', () => {
+    const vault = new AgypVault(customVault, customGemini);
+    vault.addOrUpdateAccount(
+      'alice@example.com',
+      'token-alice',
+      JSON.stringify({ active: 'alice@example.com' }),
+      JSON.stringify({ access_token: 'oauth-alice', email: 'alice@example.com' })
+    );
+
+    const globalToken = join(customGemini, 'jetski-standalone-oauth-token');
+    const globalAccounts = join(customGemini, 'google_accounts.json');
+    const globalOauth = join(customGemini, 'oauth_creds.json');
+
+    expect(existsSync(globalToken)).toBeTrue();
+    expect(readFileSync(globalToken, 'utf8')).toBe('token-alice');
+    expect(existsSync(globalAccounts)).toBeTrue();
+    expect(readFileSync(globalAccounts, 'utf8')).toContain('alice@example.com');
+    expect(existsSync(globalOauth)).toBeTrue();
+    expect(readFileSync(globalOauth, 'utf8')).toContain('oauth-alice');
+
+    // Add second account and switch
+    vault.addOrUpdateAccount(
+      'bob@example.com',
+      'token-bob',
+      JSON.stringify({ active: 'bob@example.com' }),
+      JSON.stringify({ access_token: 'oauth-bob', email: 'bob@example.com' })
+    );
+
+    expect(readFileSync(globalToken, 'utf8')).toBe('token-bob');
+    expect(readFileSync(globalAccounts, 'utf8')).toContain('bob@example.com');
+
+    // Switch back to alice
+    vault.setActiveAccount('alice@example.com');
+    expect(readFileSync(globalToken, 'utf8')).toBe('token-alice');
+    expect(readFileSync(globalAccounts, 'utf8')).toContain('alice@example.com');
+    expect(readFileSync(globalOauth, 'utf8')).toContain('oauth-alice');
   });
 });

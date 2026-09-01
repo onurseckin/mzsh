@@ -9,8 +9,8 @@
   "type": "commonjs",
   "module": "index.ts",
   "scripts": {
-    "build": "bun run clean && tsc && bun build lib/index.js --outdir dist --target bun --minify",
-    "build:dev": "bun run clean && tsc && bun build lib/index.js --outdir dist --target bun",
+    "build": "bun run clean && tsc && bun build lib/src/index.js --outdir dist --target bun --packages=external --minify",
+    "build:dev": "bun run clean && tsc && bun build lib/src/index.js --outdir dist --target bun --packages=external",
     "build:ts": "tsc",
     "clean": "rm -rf dist lib",
     "prebuild": "bun run clean",

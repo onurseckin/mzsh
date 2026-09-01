@@ -70,7 +70,9 @@ export class AgypService {
       `.staging_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
     );
     mkdirSync(stagingDir, { recursive: true, mode: 0o700 });
-    const stagingToken = join(stagingDir, 'jetski-standalone-oauth-token');
+    const stagingGeminiDir = join(stagingDir, '.gemini');
+    mkdirSync(stagingGeminiDir, { recursive: true, mode: 0o700 });
+    const stagingToken = join(stagingGeminiDir, 'jetski-standalone-oauth-token');
 
     let ttyInFd: number | null = null;
     let ttyOutFd: number | null = null;
@@ -105,56 +107,77 @@ export class AgypService {
           }
         }
 
-        // Launch agy with isolated token target
-        spawnSync('agy', ['--print', 'echo auth_test_success'], {
+        // Launch agy with isolated HOME so it triggers browser OAuth and writes to stagingGeminiDir
+        spawnSync('agy', ['--print', 'login_success'], {
           stdio: childStdio,
           env: {
             ...process.env,
-            JETSKI_STANDALONE_OAUTH_TOKEN_PATH: stagingToken,
+            HOME: stagingDir,
           },
         });
+      }
 
-        if (!existsSync(stagingToken)) {
-          // Try interactive session if print mode did not trigger login
-          spawnSync('agy', ['auth', 'login'], {
-            stdio: childStdio,
-            env: {
-              ...process.env,
-              JETSKI_STANDALONE_OAUTH_TOKEN_PATH: stagingToken,
-            },
-          });
+      let finalTokenPath = stagingToken;
+      if (!existsSync(finalTokenPath)) {
+        const fallbackStagingToken = join(stagingDir, 'jetski-standalone-oauth-token');
+        if (existsSync(fallbackStagingToken)) {
+          finalTokenPath = fallbackStagingToken;
         }
       }
 
-      if (!existsSync(stagingToken)) {
+      if (!existsSync(finalTokenPath)) {
         return {
           success: false,
           message: 'Login was not completed or token file was not written.',
         };
       }
 
-      const tokenContent = readFileSync(stagingToken, 'utf8');
+      const tokenContent = readFileSync(finalTokenPath, 'utf8');
+      let googleAccountsContent: string | undefined;
+      const stagingGoogleAccounts = join(stagingGeminiDir, 'google_accounts.json');
+      if (existsSync(stagingGoogleAccounts)) {
+        googleAccountsContent = readFileSync(stagingGoogleAccounts, 'utf8');
+      }
+
+      let oauthCredsContent: string | undefined;
+      const stagingOauthCreds = join(stagingGeminiDir, 'oauth_creds.json');
+      if (existsSync(stagingOauthCreds)) {
+        oauthCredsContent = readFileSync(stagingOauthCreds, 'utf8');
+      }
+
       let email = suggestedEmail;
+      if (!email && googleAccountsContent) {
+        try {
+          const parsed = JSON.parse(googleAccountsContent) as GoogleAccountsPayload;
+          email = parsed.active ?? parsed.primaryEmail ?? parsed.accounts?.[0]?.email;
+        } catch {
+          // ignore
+        }
+      }
+
+      if (!email && oauthCredsContent) {
+        try {
+          const parsed = JSON.parse(oauthCredsContent) as { id_token?: string; email?: string };
+          if (parsed.email && parsed.email.includes('@')) {
+            email = parsed.email;
+          } else if (parsed.id_token) {
+            email = this.vault.extractEmailFromJwt(parsed.id_token) ?? undefined;
+          }
+        } catch {
+          // ignore
+        }
+      }
 
       if (!email) {
-        // Inspect global google_accounts.json if updated
-        const globalAccounts = join(this.vault.getVaultRoot(), '..', 'google_accounts.json');
-        if (existsSync(globalAccounts)) {
-          try {
-            const raw = readFileSync(globalAccounts, 'utf8');
-            const parsed = JSON.parse(raw) as GoogleAccountsPayload;
-            email = parsed.active ?? parsed.primaryEmail ?? parsed.accounts?.[0]?.email;
-          } catch {
-            // ignore
-          }
-        }
+        email = this.vault.extractEmailFromToken(tokenContent) ?? undefined;
       }
 
       if (!email) {
         email = `account_${Date.now()}`;
       }
 
-      this.vault.addOrUpdateAccount(email, tokenContent);
+      this.vault.addOrUpdateAccount(email, tokenContent, googleAccountsContent, oauthCredsContent);
+      this.vault.setActiveAccount(email);
       const exportData = this.vault.getEnvironmentExport(email);
 
       return {
