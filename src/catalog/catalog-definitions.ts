@@ -183,6 +183,19 @@ export const commands: readonly CatalogCommand[] = [
     },
   },
   {
+    name: 'config',
+    summary: 'Launch interactive config file navigator.',
+    risk: 'read-only',
+    available: true,
+    palette: { keywords: ['config', 'files'] },
+    tui: tui(['space', 'c']),
+    parser: {
+      kind: 'config',
+      flags: [{ name: 'open-type', value: 'string', description: 'Open type' }],
+      positional: 'none',
+    },
+  },
+  {
     name: 'tui',
     summary: 'Open the full-screen MZSH interface.',
     risk: 'read-only',

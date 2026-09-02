@@ -178,6 +178,13 @@ export function parseCatalogArgs(args: readonly string[]): CatalogParseResult {
       ? { kind: 'audit', ...(typeof source === 'string' ? { source } : {}), json }
       : { kind: 'usage-error', code: 'unexpected-positional' };
   }
+  if (command.parser.kind === 'config') {
+    const rawOpenType = values.get('open-type');
+    const openType = typeof rawOpenType === 'string' ? rawOpenType : undefined;
+    return positionals.length === 0
+      ? { kind: 'config', ...(openType !== undefined ? { openType } : {}) }
+      : { kind: 'usage-error', code: 'unexpected-positional' };
+  }
   if (command.parser.kind === 'inventory') {
     return positionals.length <= 1
       ? {

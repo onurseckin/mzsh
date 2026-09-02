@@ -32,12 +32,21 @@ type RecordDefinition = {
 
 const recordDefinitions: readonly RecordDefinition[] = [
   { categoryId: 'applications', name: 'mzsh-checkout', origins: ['path'], metadata: {} },
+  { categoryId: 'applications', name: 'macos-apps', origins: ['path'], metadata: {} },
   {
     categoryId: 'runtimes',
     name: 'bun',
     origins: ['path'],
     metadata: {},
   },
+  { categoryId: 'runtimes', name: 'node', origins: ['path'], metadata: {} },
+  { categoryId: 'runtimes', name: 'python', origins: ['path'], metadata: {} },
+  { categoryId: 'runtimes', name: 'ruby', origins: ['path'], metadata: {} },
+  { categoryId: 'runtimes', name: 'go', origins: ['path'], metadata: {} },
+  { categoryId: 'runtimes', name: 'rust', origins: ['path'], metadata: {} },
+  { categoryId: 'runtimes', name: 'java', origins: ['path'], metadata: {} },
+  { categoryId: 'managers', name: 'homebrew', origins: ['path'], metadata: {} },
+  { categoryId: 'scripts', name: 'cli-tools', origins: ['path'], metadata: {} },
   {
     categoryId: 'managers',
     name: 'pnpm',

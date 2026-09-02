@@ -11,7 +11,8 @@ export type CatalogFlag =
   | { name: 'critical-path'; value: 'boolean'; description: string; required?: boolean }
   | { name: 'simulate'; value: 'boolean'; description: string; required?: boolean }
   | { name: 'filter'; value: 'status-filter'; description: string; required?: boolean }
-  | { name: 'workflow'; value: 'string'; description: string; required?: boolean };
+  | { name: 'workflow'; value: 'string'; description: string; required?: boolean }
+  | { name: 'open-type'; value: 'string'; description: string; required?: boolean };
 
 export type CatalogParser =
   | { kind: 'audit'; flags: readonly CatalogFlag[]; positional: 'none' }
@@ -22,6 +23,7 @@ export type CatalogParser =
   | { kind: 'update'; flags: readonly CatalogFlag[]; positional: 'none' }
   | { kind: 'rollback'; flags: readonly CatalogFlag[]; positional: 'receipt-id' }
   | { kind: 'dag'; flags: readonly CatalogFlag[]; positional: 'optional-workflow' }
+  | { kind: 'config'; flags: readonly CatalogFlag[]; positional: 'none' }
   | { kind: 'tui'; flags: readonly CatalogFlag[]; positional: 'none' }
   | { kind: 'placeholder'; flags: readonly CatalogFlag[]; positional: 'none' };
 
@@ -123,6 +125,15 @@ export type CatalogCommand =
       parser: Extract<CatalogParser, { kind: 'tui' }>;
     }
   | {
+      name: 'config';
+      summary: string;
+      risk: CommandRisk;
+      available: true;
+      palette: CatalogPaletteMetadata;
+      tui: CatalogTuiMetadata;
+      parser: Extract<CatalogParser, { kind: 'config' }>;
+    }
+  | {
       name: 'dag';
       summary: string;
       risk: CommandRisk;
@@ -149,6 +160,7 @@ export type ManagedCommand =
       filter?: string;
       json: boolean;
     }
+  | { kind: 'config'; openType?: string }
   | { kind: 'tui' }
   | (MutationCommand & { kind: 'setup' })
   | (MutationCommand & { kind: 'bootstrap'; source: string; legacySource?: string })

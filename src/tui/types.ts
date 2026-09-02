@@ -1,6 +1,13 @@
 import type { CommandCatalog, CommandRisk } from '../catalog/types';
 
-export type TuiScreen = 'dashboard' | 'plan-review' | 'history' | 'dag';
+export type TuiScreen =
+  | 'dashboard'
+  | 'plan-review'
+  | 'history'
+  | 'dag'
+  | 'config'
+  | 'inventory'
+  | 'plan-builder';
 
 export type TuiEnvMode = 'production' | 'development' | 'custom';
 
@@ -144,7 +151,15 @@ export interface TuiViewModel {
   readonly viewport: TuiViewportProfile;
 }
 
-export const TUI_SCREENS: readonly TuiScreen[] = ['dashboard', 'plan-review', 'history', 'dag'];
+export const TUI_SCREENS: readonly TuiScreen[] = [
+  'dashboard',
+  'plan-review',
+  'history',
+  'dag',
+  'config',
+  'inventory',
+  'plan-builder',
+];
 export const TUI_ENV_MODES: readonly TuiEnvMode[] = ['development', 'production', 'custom'];
 
 export function getNextScreen(current: TuiScreen): TuiScreen {

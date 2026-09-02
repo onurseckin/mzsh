@@ -194,6 +194,14 @@ export function runMzshCli(args: readonly string[], dependencies: RunMzshCliDepe
     dependencies.tui.launch();
     return 0;
   }
+  if (parsed.kind === 'config') {
+    if (dependencies.tui === undefined) {
+      dependencies.write('MZSH_USAGE_command-unavailable');
+      return 2;
+    }
+    dependencies.tui.launch({ screen: 'config' });
+    return 0;
+  }
   if (parsed.kind === 'env') return runEnvironmentCommand(parsed, dependencies);
   if (parsed.kind === 'dag') return runDagCommand(parsed, dependencies);
   if (parsed.kind === 'setup') return runLifecycleCommand(parsed, dependencies);

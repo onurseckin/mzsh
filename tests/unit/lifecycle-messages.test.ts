@@ -26,6 +26,7 @@ test('guides legacy lifecycle callers through the managed reversible workflow', 
     'bun run mzsh -- inventory [category] [--json]',
     'bun run mzsh -- env <list|get|set> [name] [--json]',
     'bun run mzsh -- dag [workflow] [--workflow <string>] [--format <box|tree|compact>] [--critical-path] [--simulate] [--filter <status>] [--json]',
+    'bun run mzsh -- config [--open-type <string>]',
     'bun run mzsh -- tui',
   ]);
   expect(installMessages.info.starting).toContain('bun run mzsh -- audit');
@@ -51,6 +52,7 @@ test('guides legacy lifecycle callers through the managed reversible workflow', 
     'bun run mzsh -- inventory [category] [--json]',
     'bun run mzsh -- env <list|get|set> [name] [--json]',
     'bun run mzsh -- dag [workflow] [--workflow <string>] [--format <box|tree|compact>] [--critical-path] [--simulate] [--filter <status>] [--json]',
+    'bun run mzsh -- config [--open-type <string>]',
     'bun run mzsh -- tui',
   ]);
   expect(checkoutLocalCommandLines).toEqual([
@@ -62,6 +64,7 @@ test('guides legacy lifecycle callers through the managed reversible workflow', 
     '  bun run mzsh -- inventory [category] [--json]',
     '  bun run mzsh -- env <list|get|set> [name] [--json]',
     '  bun run mzsh -- dag [workflow] [--workflow <string>] [--format <box|tree|compact>] [--critical-path] [--simulate] [--filter <status>] [--json]',
+    '  bun run mzsh -- config [--open-type <string>]',
     '  bun run mzsh -- tui',
   ]);
 });

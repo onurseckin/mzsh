@@ -60,12 +60,14 @@ describe('inventory service', () => {
 
     const records = service.collect({ categoryId: 'runtimes', snapshot: snapshot() });
 
-    expect(records[0]).toMatchObject({
-      categoryId: 'runtimes',
-      origin: 'path',
-      version: '1.0.0',
-    });
-    expect(fakeProcess.calls).toEqual([['bun', '--version']]);
+    expect(records).toContainEqual(
+      expect.objectContaining({
+        categoryId: 'runtimes',
+        origin: 'path',
+        version: '1.0.0',
+      })
+    );
+    expect(fakeProcess.calls).toContainEqual(['bun', '--version']);
   });
 
   test('summarizes PATH and environment metadata without retaining observed values', () => {
@@ -104,9 +106,11 @@ describe('inventory service', () => {
         write: (message) => output.push(message),
       })
     ).toBe(0);
-    expect(JSON.parse(output[0] ?? '[]')).toEqual([
-      expect.objectContaining({ categoryId: 'runtimes', name: 'bun', version: '1.0.0' }),
-    ]);
+    expect(JSON.parse(output[0] ?? '[]')).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ categoryId: 'runtimes', name: 'bun', version: '1.0.0' }),
+      ])
+    );
   });
 
   test('blocks provider-derived values and path-like data from inventory CLI output', () => {

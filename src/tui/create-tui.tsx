@@ -25,11 +25,17 @@ export interface RunTuiDependencies {
 }
 
 export interface TuiLauncher {
-  launch(): void;
+  launch(overrideState?: Partial<TuiState>): void;
 }
 
 export function createTuiLauncher(dependencies: RunTuiDependencies): TuiLauncher {
-  return { launch: () => void runTui(dependencies) };
+  return {
+    launch: (overrideState?: Partial<TuiState>) =>
+      void runTui({
+        ...dependencies,
+        state: () => ({ ...dependencies.state(), ...overrideState }),
+      }),
+  };
 }
 
 export async function runTui(dependencies: RunTuiDependencies): Promise<void> {

@@ -7,6 +7,9 @@ import { DagScreen } from './screens/dag-screen';
 import { Dashboard } from './screens/dashboard';
 import { History } from './screens/history';
 import { PlanReview } from './screens/plan-review';
+import { ConfigScreen } from './screens/config-screen';
+import { InventoryScreen } from './screens/inventory-screen';
+import { PlanBuilderScreen } from './screens/plan-builder-screen';
 import {
   createTuiViewModel,
   getNextEnvMode,
@@ -152,6 +155,9 @@ export function TuiApp({ catalog, state }: TuiAppProps): React.ReactNode {
             {viewModel.screen === 'plan-review' ? <PlanReview viewModel={viewModel} /> : null}
             {viewModel.screen === 'history' ? <History viewModel={viewModel} /> : null}
             {viewModel.screen === 'dag' ? <DagScreen viewModel={viewModel} /> : null}
+            {viewModel.screen === 'config' ? <ConfigScreen /> : null}
+            {viewModel.screen === 'inventory' ? <InventoryScreen /> : null}
+            {viewModel.screen === 'plan-builder' ? <PlanBuilderScreen /> : null}
           </>
         )}
       </box>

@@ -16,11 +16,17 @@ describe('TUI navigation utilities', () => {
     expect(getNextScreen('dashboard')).toBe('plan-review');
     expect(getNextScreen('plan-review')).toBe('history');
     expect(getNextScreen('history')).toBe('dag');
-    expect(getNextScreen('dag')).toBe('dashboard');
+    expect(getNextScreen('dag')).toBe('config');
+    expect(getNextScreen('config')).toBe('inventory');
+    expect(getNextScreen('inventory')).toBe('plan-builder');
+    expect(getNextScreen('plan-builder')).toBe('dashboard');
   });
 
   test('cycles screens backward in strict order', () => {
-    expect(getPreviousScreen('dashboard')).toBe('dag');
+    expect(getPreviousScreen('dashboard')).toBe('plan-builder');
+    expect(getPreviousScreen('plan-builder')).toBe('inventory');
+    expect(getPreviousScreen('inventory')).toBe('config');
+    expect(getPreviousScreen('config')).toBe('dag');
     expect(getPreviousScreen('dag')).toBe('history');
     expect(getPreviousScreen('history')).toBe('plan-review');
     expect(getPreviousScreen('plan-review')).toBe('dashboard');
@@ -33,7 +39,15 @@ describe('TUI navigation utilities', () => {
   });
 
   test('contains all expected screens and env modes', () => {
-    expect(TUI_SCREENS).toEqual(['dashboard', 'plan-review', 'history', 'dag']);
+    expect(TUI_SCREENS).toEqual([
+      'dashboard',
+      'plan-review',
+      'history',
+      'dag',
+      'config',
+      'inventory',
+      'plan-builder',
+    ]);
     expect(TUI_ENV_MODES).toEqual(['development', 'production', 'custom']);
   });
 
