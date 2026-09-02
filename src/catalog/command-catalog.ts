@@ -1,5 +1,6 @@
 import { isAbsolute } from 'node:path';
 import { isReviewedPlanId } from '../domain/action-plan';
+import { commands } from './catalog-definitions';
 import type {
   CatalogCommand,
   CatalogCommandName,
@@ -7,163 +8,6 @@ import type {
   CatalogParseResult,
   CommandCatalog,
 } from './types';
-
-const applyFlag: CatalogFlag = {
-  name: 'apply',
-  value: 'boolean',
-  description: 'Apply the reviewed transaction instead of showing its plan.',
-};
-const planIdFlag: CatalogFlag = {
-  name: 'plan-id',
-  value: 'reviewed-plan-id',
-  description: 'Use the exact reviewed plan identifier from the dry-run output.',
-};
-const confirmFlag: CatalogFlag = {
-  name: 'confirm',
-  value: 'confirmation',
-  description: 'Confirm the reviewed plan with the literal value APPLY.',
-};
-const auditJsonFlag: CatalogFlag = {
-  name: 'json',
-  value: 'boolean',
-  description: 'Render the audit report as JSON.',
-};
-const inventoryJsonFlag: CatalogFlag = {
-  name: 'json',
-  value: 'boolean',
-  description: 'Render inventory metadata as JSON.',
-};
-const environmentJsonFlag: CatalogFlag = {
-  name: 'json',
-  value: 'boolean',
-  description: 'Render redacted environment metadata as JSON.',
-};
-const sourceFlag: CatalogFlag = {
-  name: 'source',
-  value: 'absolute-path',
-  description: 'Use an absolute checkout path.',
-};
-const legacySourceFlag: CatalogFlag = {
-  name: 'legacy-source',
-  value: 'absolute-path',
-  description: 'Inspect one absolute legacy configuration path during adoption.',
-};
-
-const navigation = [
-  { screen: 'dashboard', keys: ['g', 'd'] },
-  { screen: 'plan-review', keys: ['g', 'p'] },
-  { screen: 'history', keys: ['g', 'h'] },
-] as const;
-
-function tui(keys: readonly ['space', string]) {
-  return { keys, leader: 'space' as const, navigation };
-}
-
-const commands: readonly CatalogCommand[] = [
-  {
-    name: 'audit',
-    summary: 'Inspect the local managed-shell environment.',
-    risk: 'read-only',
-    available: true,
-    palette: { keywords: ['audit', 'inspect'] },
-    tui: tui(['space', 'a']),
-    parser: { kind: 'audit', flags: [sourceFlag, auditJsonFlag], positional: 'none' },
-  },
-  {
-    name: 'bootstrap',
-    summary: 'Plan or apply initial managed-shell adoption.',
-    risk: 'destructive',
-    available: true,
-    palette: { keywords: ['bootstrap', 'adopt'] },
-    tui: tui(['space', 'b']),
-    parser: {
-      kind: 'bootstrap',
-      flags: [
-        { ...sourceFlag, required: true },
-        legacySourceFlag,
-        applyFlag,
-        planIdFlag,
-        confirmFlag,
-      ],
-      positional: 'none',
-    },
-  },
-  {
-    name: 'update',
-    summary: 'Plan or apply a local managed update.',
-    risk: 'destructive',
-    available: true,
-    palette: { keywords: ['update', 'plan'] },
-    tui: tui(['space', 'u']),
-    parser: {
-      kind: 'update',
-      flags: [applyFlag, planIdFlag, confirmFlag],
-      positional: 'none',
-    },
-  },
-  {
-    name: 'rollback',
-    summary: 'Restore one recorded adoption transaction.',
-    risk: 'destructive',
-    available: true,
-    palette: { keywords: ['rollback', 'receipt'] },
-    tui: tui(['space', 'r']),
-    parser: {
-      kind: 'rollback',
-      flags: [applyFlag, planIdFlag, confirmFlag],
-      positional: 'receipt-id',
-    },
-  },
-  {
-    name: 'setup',
-    summary: 'Set up the managed MZSH lifecycle.',
-    risk: 'destructive',
-    available: true,
-    palette: { keywords: ['setup', 'install'] },
-    tui: tui(['space', 's']),
-    parser: {
-      kind: 'setup',
-      flags: [applyFlag, planIdFlag, confirmFlag],
-      positional: 'none',
-    },
-  },
-  {
-    name: 'history',
-    summary: 'Inspect recorded managed action history.',
-    risk: 'read-only',
-    available: false,
-    palette: { keywords: ['history', 'receipts'] },
-    tui: tui(['space', 'h']),
-    parser: { kind: 'placeholder', flags: [], positional: 'none' },
-  },
-  {
-    name: 'inventory',
-    summary: 'Inspect observed machine inventory.',
-    risk: 'read-only',
-    available: true,
-    palette: { keywords: ['inventory', 'discover'] },
-    tui: tui(['space', 'i']),
-    parser: { kind: 'inventory', flags: [inventoryJsonFlag], positional: 'optional-category' },
-  },
-  {
-    name: 'env',
-    summary: 'Inspect private environment metadata or open its protected setter.',
-    risk: 'sensitive',
-    available: true,
-    palette: { keywords: ['env', 'private'] },
-    tui: tui(['space', 'e']),
-    parser: { kind: 'env', flags: [environmentJsonFlag], positional: 'environment-operation' },
-  },
-  {
-    name: 'tui',
-    summary: 'Open the full-screen MZSH interface.',
-    risk: 'read-only',
-    available: true,
-    palette: { keywords: ['tui', 'interactive'] },
-    tui: tui(['space', 't']),
-    parser: { kind: 'tui', flags: [], positional: 'none' },
-  },
-];
 
 function hasCommand(name: string): name is CatalogCommandName {
   return commands.some((command) => command.name === name);
@@ -196,6 +40,9 @@ function formatFlagValue(flag: CatalogFlag, style: CatalogUsageStyle): string {
   if (flag.value === 'boolean') return `--${flag.name}`;
   if (flag.value === 'reviewed-plan-id') return '--plan-id reviewed-plan-id';
   if (flag.value === 'confirmation') return '--confirm APPLY';
+  if (flag.value === 'format-style') return '--format <box|tree|compact>';
+  if (flag.value === 'status-filter') return '--filter <status>';
+  if (flag.value === 'string') return `--${flag.name} <string>`;
   if (style === 'help') return `--${flag.name} absolute-path`;
   return flag.name === 'legacy-source'
     ? `--${flag.name} /absolute/file`
@@ -208,9 +55,11 @@ function formatUsage(command: CatalogCommand, style: CatalogUsageStyle): string 
       ? ' receipt-id'
       : command.parser.positional === 'optional-category'
         ? ' [category]'
-        : command.parser.positional === 'environment-operation'
-          ? ' <list|get|set> [name]'
-          : '';
+        : command.parser.positional === 'optional-workflow'
+          ? ' [workflow]'
+          : command.parser.positional === 'environment-operation'
+            ? ' <list|get|set> [name]'
+            : '';
   const flags = command.parser.flags
     .map((flag) => {
       const value = formatFlagValue(flag, style);
@@ -225,6 +74,25 @@ export function renderCatalogUsage(
   style: CatalogUsageStyle
 ): string {
   return formatUsage(catalog.require(commandName), style);
+}
+
+function parseEnv(positionals: readonly string[], json: boolean): CatalogParseResult {
+  const action = positionals[0];
+  if (action === 'list' && positionals.length === 1) return { kind: 'env', action: 'list', json };
+  if (action === 'get' && positionals.length === 2) {
+    const name = positionals[1];
+    return name === undefined
+      ? { kind: 'usage-error', code: 'unexpected-positional' }
+      : { kind: 'env', action: 'get', name, json };
+  }
+  if (action === 'set' && positionals.length === 2) {
+    const name = positionals[1];
+    if (name === undefined) return { kind: 'usage-error', code: 'unexpected-positional' };
+    return json
+      ? { kind: 'usage-error', code: 'invalid-flags' }
+      : { kind: 'env', action: 'set', name, json };
+  }
+  return { kind: 'usage-error', code: 'unexpected-positional' };
 }
 
 export function parseCatalogArgs(args: readonly string[]): CatalogParseResult {
@@ -244,12 +112,10 @@ export function parseCatalogArgs(args: readonly string[]): CatalogParseResult {
     }
     const flag = flagFor(command, token.slice(2));
     if (flag === undefined) {
-      return {
-        kind: 'usage-error',
-        code: knownFlagNames.has(token.slice(2) as CatalogFlag['name'])
-          ? 'invalid-flags'
-          : 'unknown-flag',
-      };
+      const code = knownFlagNames.has(token.slice(2) as CatalogFlag['name'])
+        ? 'invalid-flags'
+        : 'unknown-flag';
+      return { kind: 'usage-error', code };
     }
     if (flag.value === 'boolean') {
       if (values.has(flag.name)) return { kind: 'usage-error', code: 'invalid-flags' };
@@ -257,8 +123,10 @@ export function parseCatalogArgs(args: readonly string[]): CatalogParseResult {
       continue;
     }
     const value = args[index + 1];
-    if (value === undefined) return { kind: 'usage-error', code: 'invalid-flags' };
-    if (value.startsWith('-')) return { kind: 'usage-error', code: 'invalid-flags' };
+    if (value === undefined || value.startsWith('-'))
+      return { kind: 'usage-error', code: 'invalid-flags' };
+    if (flag.value === 'format-style' && value !== 'box' && value !== 'tree' && value !== 'compact')
+      return { kind: 'usage-error', code: 'invalid-flags' };
     if (flag.value === 'absolute-path' && !isAbsolute(value))
       return { kind: 'usage-error', code: 'absolute-path-required' };
     if (flag.value === 'reviewed-plan-id' && !isReviewedPlanId(value))
@@ -267,15 +135,11 @@ export function parseCatalogArgs(args: readonly string[]): CatalogParseResult {
     values.set(flag.name, value);
     index += 1;
   }
-  if (command.parser.kind === 'placeholder') {
-    return positionals.length === 0
-      ? { kind: 'catalog-placeholder', command: command.name }
-      : { kind: 'usage-error', code: 'unexpected-positional' };
-  }
-  if (command.parser.kind === 'tui') {
-    return positionals.length === 0
+  if (command.parser.kind === 'placeholder' || command.parser.kind === 'tui') {
+    if (positionals.length !== 0) return { kind: 'usage-error', code: 'unexpected-positional' };
+    return command.parser.kind === 'tui'
       ? { kind: 'tui' }
-      : { kind: 'usage-error', code: 'unexpected-positional' };
+      : { kind: 'catalog-placeholder', command: command.name };
   }
   const source = values.get('source');
   const legacySource = values.get('legacy-source');
@@ -283,12 +147,31 @@ export function parseCatalogArgs(args: readonly string[]): CatalogParseResult {
   const planId = values.get('plan-id');
   const confirmation = values.get('confirm');
   const json = values.has('json');
-  const invalidApply = !apply && (planId !== undefined ? true : confirmation !== undefined);
-  const invalidPlanId = typeof planId !== 'undefined' && typeof planId !== 'string';
-  const invalidConfirmation =
-    typeof confirmation !== 'undefined' && typeof confirmation !== 'string';
-  if (invalidApply ? true : invalidPlanId ? true : invalidConfirmation) {
+  if (!apply && (planId !== undefined || confirmation !== undefined)) {
     return { kind: 'usage-error', code: 'invalid-flags' };
+  }
+  if (command.parser.kind === 'dag') {
+    if (positionals.length > 1) return { kind: 'usage-error', code: 'unexpected-positional' };
+    const workflowVal = values.get('workflow');
+    const workflow = positionals[0] ?? (typeof workflowVal === 'string' ? workflowVal : undefined);
+    const rawFormat = values.get('format');
+    const format =
+      rawFormat === 'box' || rawFormat === 'tree' || rawFormat === 'compact'
+        ? rawFormat
+        : undefined;
+    const criticalPath = values.has('critical-path') ? true : undefined;
+    const simulate = values.has('simulate') ? true : undefined;
+    const filterVal = values.get('filter');
+    const filter = typeof filterVal === 'string' ? filterVal : undefined;
+    return {
+      kind: 'dag',
+      ...(workflow !== undefined ? { workflow } : {}),
+      ...(format !== undefined ? { format } : {}),
+      ...(criticalPath !== undefined ? { criticalPath } : {}),
+      ...(simulate !== undefined ? { simulate } : {}),
+      ...(filter !== undefined ? { filter } : {}),
+      json,
+    };
   }
   if (command.parser.kind === 'audit') {
     return positionals.length === 0
@@ -304,23 +187,7 @@ export function parseCatalogArgs(args: readonly string[]): CatalogParseResult {
         }
       : { kind: 'usage-error', code: 'unexpected-positional' };
   }
-  if (command.parser.kind === 'env') {
-    const action = positionals[0];
-    if (action === 'list' && positionals.length === 1) return { kind: 'env', action: 'list', json };
-    if (action === 'get' && positionals.length === 2) {
-      const name = positionals[1];
-      if (name === undefined) return { kind: 'usage-error', code: 'unexpected-positional' };
-      return { kind: 'env', action: 'get', name, json };
-    }
-    if (action === 'set' && positionals.length === 2) {
-      const name = positionals[1];
-      if (name === undefined) return { kind: 'usage-error', code: 'unexpected-positional' };
-      return json
-        ? { kind: 'usage-error', code: 'invalid-flags' }
-        : { kind: 'env', action: 'set', name, json };
-    }
-    return { kind: 'usage-error', code: 'unexpected-positional' };
-  }
+  if (command.parser.kind === 'env') return parseEnv(positionals, json);
   if (command.parser.kind === 'setup') {
     return positionals.length === 0
       ? {
@@ -355,8 +222,8 @@ export function parseCatalogArgs(args: readonly string[]): CatalogParseResult {
       : { kind: 'usage-error', code: 'unexpected-positional' };
   }
   const receiptId = positionals[0];
-  if (positionals.length !== 1) return { kind: 'usage-error', code: 'unexpected-positional' };
-  if (receiptId === undefined) return { kind: 'usage-error', code: 'unexpected-positional' };
+  if (positionals.length !== 1 || receiptId === undefined)
+    return { kind: 'usage-error', code: 'unexpected-positional' };
   if (!/^[A-Za-z0-9_-]+$/.test(receiptId))
     return { kind: 'usage-error', code: 'receipt-id-invalid' };
   return {

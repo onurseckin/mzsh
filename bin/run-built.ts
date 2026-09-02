@@ -4,6 +4,15 @@
 import { existsSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
+import {
+  registerTerminalSignalTraps,
+  restoreTerminalState,
+} from '../src/infrastructure/terminal-cleanup';
+
+const unregister = registerTerminalSignalTraps({
+  exitOnSignal: true,
+  exitCodeOnSignal: 0,
+});
 
 const __filename: string = fileURLToPath(import.meta.url);
 const __dirname: string = dirname(__filename);
@@ -22,15 +31,23 @@ interface ZshrcManagerConstructor {
 
 let ZshrcManager: ZshrcManagerConstructor;
 
-if (existsSync(builtFile)) {
-  // Use built version for better performance
-  const module = await import(builtFile);
-  ZshrcManager = module.default;
-} else {
-  // Fall back to source version for development
-  const module = await import(sourceFile);
-  ZshrcManager = module.default;
-}
+try {
+  if (existsSync(builtFile)) {
+    // Use built version for better performance
+    const module = await import(builtFile);
+    ZshrcManager = module.default;
+  } else {
+    // Fall back to source version for development
+    const module = await import(sourceFile);
+    ZshrcManager = module.default;
+  }
 
-const command = new ZshrcManager(process.argv.slice(2), {});
-await command.run();
+  const command = new ZshrcManager(process.argv.slice(2), {});
+  await command.run();
+  unregister();
+  restoreTerminalState();
+} catch (error) {
+  unregister();
+  restoreTerminalState();
+  throw error;
+}

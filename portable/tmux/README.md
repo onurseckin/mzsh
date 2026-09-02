@@ -1,6 +1,6 @@
 # Portable Tmux Foundation
 
-[Index: repository README](../../README.md)
+[Index: repository README](../../../README.md)
 
 `portable/tmux` is MZSH's non-secret terminal multiplexer foundation. It contains reproducible configuration contracts and keybinding models for Tmux across environments.
 

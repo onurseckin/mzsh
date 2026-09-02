@@ -75,7 +75,9 @@ test('uses exact stable dependency pins and named validation suites', () => {
   expect(manifest.scripts.completion).toBe(
     'bun run test:integration --test-name-pattern completion'
   );
-  expect(manifest.scripts['shell:check']).toBe('mise exec -- bash scripts/check-shell-quality.sh');
+  expect(manifest.scripts['shell:check']).toBe(
+    'mise exec -- bash scripts/check/check-shell-quality.sh'
+  );
 });
 
 test('defines the repository-owned quality and contributor contracts', () => {
@@ -90,8 +92,8 @@ test('defines the repository-owned quality and contributor contracts', () => {
   });
   expect(existsSync(join(root, 'lefthook.yml'))).toBe(true);
   expect(existsSync(join(root, 'AGENTS.md'))).toBe(true);
-  expect(existsSync(join(root, '.agents', 'contributing.md'))).toBe(true);
-  expect(existsSync(join(root, '.agents', 'safety.md'))).toBe(true);
+  expect(existsSync(join(root, 'docs', '.agents', 'contributing.md'))).toBe(true);
+  expect(existsSync(join(root, 'docs', '.agents', 'safety.md'))).toBe(true);
   expect(existsSync(join(root, '.cursor'))).toBe(false);
   expect(mise).toMatch(/^bun\s*=\s*"1\.4\.0"$/m);
   expect(mise).toMatch(/^lefthook\s*=\s*"2\.1\.10"$/m);

@@ -1,6 +1,6 @@
 # Portable WezTerm Configuration
 
-[Index: repository README](../../README.md)
+[Index: repository README](../../../README.md)
 
 `portable/wezterm` is MZSH's portable, non-secret terminal emulator configuration foundation for WezTerm.
 

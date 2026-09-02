@@ -17,6 +17,7 @@ describe('TUI action bindings', () => {
       { screen: 'dashboard', keys: ['g', 'd'] },
       { screen: 'plan-review', keys: ['g', 'p'] },
       { screen: 'history', keys: ['g', 'h'] },
+      { screen: 'dag', keys: ['g', 'g'] },
     ]);
     expect(viewModel.actions.find(({ id }) => id === 'inventory.open')).toMatchObject({
       keys: ['space', 'i'],

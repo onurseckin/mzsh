@@ -117,6 +117,10 @@ describe('portable interactive behavior modules', () => {
     mkdirSync(join(framework, 'themes', 'powerlevel10k'), { recursive: true });
     mkdirSync(join(framework, 'plugins', 'zsh-vi-mode'), { recursive: true });
     writeFileSync(
+      join(framework, 'plugins', 'zsh-vi-mode', 'zsh-vi-mode.plugin.zsh'),
+      'return 0\n'
+    );
+    writeFileSync(
       join(framework, 'themes', 'powerlevel10k', 'powerlevel10k.zsh-theme'),
       'return 0\n'
     );
@@ -143,6 +147,134 @@ describe('portable interactive behavior modules', () => {
     expect(output(present)).toContain('LOADED=1\n');
     expect(absent.exitCode).toBe(0);
     expect(errors(absent)).toBe('');
+  });
+
+  test('discovers requested plugins across core and custom paths, honoring user overrides and skipping empty directories', () => {
+    const root = fixture();
+    const framework = join(root, 'custom-omz');
+    const customDir = join(root, 'custom-dir');
+    // Core plugins with entrypoints
+    mkdirSync(join(framework, 'plugins', 'git'), { recursive: true });
+    writeFileSync(join(framework, 'plugins', 'git', 'git.plugin.zsh'), 'return 0\n');
+    mkdirSync(join(framework, 'plugins', 'fzf'), { recursive: true });
+    writeFileSync(join(framework, 'plugins', 'fzf', 'fzf.plugin.zsh'), 'return 0\n');
+    mkdirSync(join(framework, 'plugins', 'zsh-vi-mode'), { recursive: true });
+    writeFileSync(
+      join(framework, 'plugins', 'zsh-vi-mode', 'zsh-vi-mode.plugin.zsh'),
+      'return 0\n'
+    );
+    // Core empty directory without entrypoint (should be skipped)
+    mkdirSync(join(framework, 'plugins', 'aliases'), { recursive: true });
+
+    // Custom plugins with entrypoints (including custom user plugin and duplicate git)
+    mkdirSync(join(customDir, 'plugins', 'git'), { recursive: true });
+    writeFileSync(join(customDir, 'plugins', 'git', 'git.plugin.zsh'), 'return 0\n');
+    mkdirSync(join(customDir, 'plugins', 'user-tool'), { recursive: true });
+    writeFileSync(join(customDir, 'plugins', 'user-tool', 'user-tool.zsh'), 'return 0\n');
+    mkdirSync(join(customDir, 'plugins', 'zsh-autosuggestions'), { recursive: true });
+    writeFileSync(
+      join(customDir, 'plugins', 'zsh-autosuggestions', 'zsh-autosuggestions.zsh'),
+      'return 0\n'
+    );
+    mkdirSync(join(customDir, 'plugins', 'zsh-syntax-highlighting'), { recursive: true });
+    writeFileSync(
+      join(customDir, 'plugins', 'zsh-syntax-highlighting', 'zsh-syntax-highlighting.plugin.zsh'),
+      'return 0\n'
+    );
+    mkdirSync(join(customDir, 'plugins', 'fzf-tab'), { recursive: true });
+    writeFileSync(join(customDir, 'plugins', 'fzf-tab', '_fzf-tab'), '#compdef fzf-tab\n');
+    // Custom empty directory without entrypoint (should be skipped)
+    mkdirSync(join(customDir, 'plugins', 'aws'), { recursive: true });
+
+    writeFileSync(
+      join(framework, 'oh-my-zsh.sh'),
+      'print -r -- "EXACT_PLUGINS=${(j:,:)plugins}"\n'
+    );
+
+    const result = runInteractive(
+      root,
+      [
+        'plugins=(user-tool git)',
+        `source ${JSON.stringify(join(modulesRoot, 'oh-my-zsh.zsh'))}`,
+        'print -r -- "LOADED=${MZSH_OH_MY_ZSH_LOADED:-absent}"',
+      ].join('\n'),
+      {
+        MZSH_OH_MY_ZSH_ROOT: framework,
+        ZSH_CUSTOM: customDir,
+      }
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(errors(result)).toBe('');
+    expect(output(result)).toContain(
+      'EXACT_PLUGINS=user-tool,git,fzf,fzf-tab,zsh-autosuggestions,zsh-syntax-highlighting,zsh-vi-mode\n'
+    );
+    expect(output(result)).not.toContain('aliases');
+    expect(output(result)).not.toContain('aws');
+    expect(output(result)).toContain('LOADED=1\n');
+  });
+
+  test('resolves custom and core themes, handling subdirectories and empty theme fallback', () => {
+    const root = fixture();
+    const framework = join(root, 'omz');
+    const customDir = join(root, 'custom');
+    mkdirSync(join(framework, 'themes', 'nested-core'), { recursive: true });
+    writeFileSync(join(framework, 'themes', 'nested-core', 'nested-core.zsh-theme'), 'return 0\n');
+    mkdirSync(join(customDir, 'themes'), { recursive: true });
+    writeFileSync(join(customDir, 'themes', 'custom-flat.zsh-theme'), 'return 0\n');
+    writeFileSync(
+      join(framework, 'oh-my-zsh.sh'),
+      'print -r -- "RESOLVED_THEME=$ZSH_THEME"\nprint -r -- "ZSH_CACHE_DIR=$ZSH_CACHE_DIR"\nprint -r -- "ZSH_COMPDUMP=$ZSH_COMPDUMP"\n'
+    );
+
+    const flatResult = runInteractive(
+      root,
+      `source ${JSON.stringify(join(modulesRoot, 'oh-my-zsh.zsh'))}`,
+      {
+        MZSH_OH_MY_ZSH_ROOT: framework,
+        ZSH_CUSTOM: customDir,
+        MZSH_OH_MY_ZSH_THEME: 'custom-flat',
+      }
+    );
+    expect(flatResult.exitCode).toBe(0);
+    expect(errors(flatResult)).toBe('');
+    expect(output(flatResult)).toContain('RESOLVED_THEME=custom-flat\n');
+    expect(output(flatResult)).toContain(`ZSH_CACHE_DIR=${join(root, 'cache', 'mzsh')}\n`);
+
+    const missingResult = runInteractive(
+      root,
+      `source ${JSON.stringify(join(modulesRoot, 'oh-my-zsh.zsh'))}`,
+      {
+        MZSH_OH_MY_ZSH_ROOT: framework,
+        ZSH_CUSTOM: customDir,
+        MZSH_OH_MY_ZSH_THEME: 'nonexistent-theme',
+      }
+    );
+    expect(missingResult.exitCode).toBe(0);
+    expect(errors(missingResult)).toBe('');
+    expect(output(missingResult)).toContain('RESOLVED_THEME=\n');
+  });
+
+  test('binds vi-mode insert and command keys and reap alias in interactive shell', () => {
+    const root = fixture();
+    const script = [
+      `source ${JSON.stringify(join(modulesRoot, 'prompt-vi.zsh'))}`,
+      `source ${JSON.stringify(join(modulesRoot, 'aliases.zsh'))}`,
+      'zvm_after_init',
+      'print -r -- "VIINS_A=$(bindkey -M viins "^A")"',
+      'print -r -- "VIINS_E=$(bindkey -M viins "^E")"',
+      'print -r -- "VICMD_U=$(bindkey -M vicmd "u")"',
+      'print -r -- "REAP_ALIAS=${aliases[reap]}"',
+    ].join('\n');
+
+    const result = runInteractive(root, script);
+
+    expect(result.exitCode).toBe(0);
+    expect(errors(result)).toBe('');
+    expect(output(result)).toContain('VIINS_A="^A" beginning-of-line\n');
+    expect(output(result)).toContain('VIINS_E="^E" end-of-line\n');
+    expect(output(result)).toContain('VICMD_U="u" undo\n');
+    expect(output(result)).toContain('REAP_ALIAS=reap-zombies\n');
   });
 
   test('loads opt-in static fzf bindings and completion without evaluating command output', () => {

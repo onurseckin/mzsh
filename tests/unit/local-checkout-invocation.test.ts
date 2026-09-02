@@ -35,7 +35,8 @@ test('runs audit from a checkout through the supported package script', () => {
   });
 
   expect(result.status).toBe(0);
-  expect(JSON.parse(result.stdout)).toEqual(
+  const jsonPayload = result.stdout.slice(result.stdout.indexOf('{'));
+  expect(JSON.parse(jsonPayload)).toEqual(
     expect.objectContaining({
       version: 1,
       findings: expect.any(Array),

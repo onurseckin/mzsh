@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test';
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { CategoryRegistry } from '../../../src/domain/categories';
 import {
@@ -62,9 +63,16 @@ describe('inventory category registry', () => {
   });
 
   test('returns defensive category copies from the canonical shipped manifest', () => {
-    const manifest = readMachineManifest(
-      join(import.meta.dir, '..', '..', '..', 'manifests', 'machine-manifest.json')
-    );
+    const manifestPath = existsSync(
+      join(import.meta.dir, '..', '..', '..', 'docs', 'manifests', 'machine-manifest.json')
+    )
+      ? join(import.meta.dir, '..', '..', '..', 'docs', 'manifests', 'machine-manifest.json')
+      : existsSync(
+            join(import.meta.dir, '..', '..', '..', 'src', 'manifests', 'machine-manifest.json')
+          )
+        ? join(import.meta.dir, '..', '..', '..', 'src', 'manifests', 'machine-manifest.json')
+        : join(import.meta.dir, '..', '..', '..', 'manifests', 'machine-manifest.json');
+    const manifest = readMachineManifest(manifestPath);
     const registry = new CategoryRegistry(manifest.categories);
     const listed = registry.list();
 

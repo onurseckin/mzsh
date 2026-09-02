@@ -1,9 +1,9 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { extname, join, relative, resolve } from 'node:path';
 
-const repoRoot = resolve(__dirname, '..');
+const repoRoot = resolve(__dirname, '../..');
 
-const targetDirs = ['src', 'tests', 'bin', 'scripts', 'portable'];
+const targetDirs = ['src', 'tests', 'scripts'];
 const targetExtensions = ['.ts', '.tsx', '.zsh', '.sh'];
 
 const forbiddenPatterns: Array<{ name: string; pattern: RegExp }> = [

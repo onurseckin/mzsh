@@ -4,6 +4,15 @@
 import { existsSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
+import {
+  registerTerminalSignalTraps,
+  restoreTerminalState,
+} from '../src/infrastructure/terminal-cleanup';
+
+const unregister = registerTerminalSignalTraps({
+  exitOnSignal: true,
+  exitCodeOnSignal: 0,
+});
 
 const __filename: string = fileURLToPath(import.meta.url);
 const __dirname: string = dirname(__filename);
@@ -28,6 +37,8 @@ for (const path of possiblePaths) {
 }
 
 if (!commandPath) {
+  unregister();
+  restoreTerminalState();
   console.error('Error: Could not find mzsh command files');
   process.exit(1);
 }
@@ -39,19 +50,27 @@ try {
   if (process.argv.slice(2).join(' ') === '--zsh-completion') {
     const renderCompletion = module.renderZshCompletion;
     if (typeof renderCompletion !== 'function') {
+      unregister();
+      restoreTerminalState();
       console.error('Error: MZSH completion renderer is unavailable');
       process.exit(1);
     }
     console.log(renderCompletion());
+    unregister();
+    restoreTerminalState();
     process.exit(0);
   }
 
   if (typeof ZshrcManager !== 'function') {
+    unregister();
+    restoreTerminalState();
     console.error('Error: ZshrcManager is not a constructor function');
     console.error('Available exports:', Object.keys(module));
     process.exit(1);
   }
 } catch (error: unknown) {
+  unregister();
+  restoreTerminalState();
   const errorMessage = error instanceof Error ? error.message : 'Unknown error';
   console.error('Error loading mzsh:', errorMessage);
   process.exit(1);
@@ -65,7 +84,11 @@ try {
     version: '1.0.0',
   });
   await command.run();
+  unregister();
+  restoreTerminalState();
 } catch (error: unknown) {
+  unregister();
+  restoreTerminalState();
   const errorMessage = error instanceof Error ? error.message : 'Unknown error';
   console.error('Error running command:', errorMessage);
   process.exit(1);

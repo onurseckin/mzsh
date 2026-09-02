@@ -159,10 +159,10 @@ describe('portable Zsh initialization', () => {
       'function n() { print -r -- original-n }',
       'function dburl() { print -r -- original-dburl }',
       'function user_precmd() { return 0 }',
-      'alias rm=original-rm',
+      'alias rm=original-rm reap=original-reap',
       `precmd_functions=(user_precmd '${hostileArrayValue}')`,
       `plugins=(original-plugin '${hostileArrayValue}')`,
-      'export ZSH=original-zsh ZSH_THEME=original-theme ZSH_TMUX_CONFIG=original-tmux',
+      'export ZSH=original-zsh ZSH_CUSTOM=original-custom ZSH_CACHE_DIR=original-cache ZSH_COMPDUMP=original-compdump ZSH_THEME=original-theme ZSH_TMUX_CONFIG=original-tmux',
       'export FZF_DEFAULT_COMMAND=original-fzf',
       'unset FZF_DEFAULT_OPTS',
       `export FZF_CTRL_R_OPTS='${hostileScalar}'`,
@@ -176,7 +176,7 @@ describe('portable Zsh initialization', () => {
       `export ${failureVariable}=1`,
       'source "$MZSH_ENTRYPOINT"; first_status=$?',
       'print -r -- "FIRST=$first_status"',
-      'print -r -- "RESTORED=${aliases[rm]}:${+functions[n]}:${+functions[dburl]}:$ZSH:$ZSH_THEME:$ZSH_TMUX_CONFIG:$FZF_DEFAULT_COMMAND"',
+      'print -r -- "RESTORED=${aliases[rm]}:${aliases[reap]}:${+functions[n]}:${+functions[dburl]}:$ZSH:$ZSH_CUSTOM:$ZSH_CACHE_DIR:$ZSH_COMPDUMP:$ZSH_THEME:$ZSH_TMUX_CONFIG:$FZF_DEFAULT_COMMAND"',
       'print -r -- "ARRAYS_RESTORED=${(j:,:)precmd_functions}:${(j:,:)plugins}"',
       'print -r -- "FZF_HISTORY_RESTORED=$FZF_CTRL_R_OPTS"',
       'print -r -- "SCALAR_TYPES=${parameters[FZF_CTRL_R_OPTS]}:${parameters[MZSH_NVM_POLICY]}"',
@@ -224,7 +224,7 @@ describe('portable Zsh initialization', () => {
     expect(errorOutputOf(result)).toBe('');
     expect(outputOf(result)).toContain('FIRST=1\n');
     expect(outputOf(result)).toContain(
-      'RESTORED=original-rm:1:1:original-zsh:original-theme:original-tmux:original-fzf\n'
+      'RESTORED=original-rm:original-reap:1:1:original-zsh:original-custom:original-cache:original-compdump:original-theme:original-tmux:original-fzf\n'
     );
     expect(outputOf(result)).toContain(
       `ARRAYS_RESTORED=user_precmd,${hostileArrayValue}:original-plugin,${hostileArrayValue}\n`
@@ -258,7 +258,64 @@ describe('portable Zsh initialization', () => {
     expect(initSource).not.toContain('typeset -p');
   });
 
-  test('configures KEYTIMEOUT=1, bracketed paste, and SIGPIPE safety trap for interactive zsh input stability', () => {
+  test('restores managed variables and unsets internal temporary variables when oh-my-zsh fails', () => {
+    const fixture = createFixture();
+    const portableRoot = copyPortableRoot(fixture);
+    makeDirectory(fixture, 'home');
+    makeDirectory(fixture, 'system');
+    const frameworkRoot = makeDirectory(fixture, 'oh-my-zsh');
+    writeFileSync(
+      join(frameworkRoot, 'oh-my-zsh.sh'),
+      'if [[ ${MZSH_TEST_FAIL_OMZ:-} == 1 ]]; then return 1; fi\nreturn 0\n'
+    );
+
+    const script = [
+      'function compinit() { return 0 }',
+      'export ZSH=prior-zsh ZSH_CUSTOM=prior-custom ZSH_CACHE_DIR=prior-cache ZSH_COMPDUMP=prior-compdump',
+      'plugins=(prior-p1 prior-p2)',
+      'alias reap=prior-reap',
+      'export MZSH_TEST_FAIL_OMZ=1',
+      'source "$MZSH_ENTRYPOINT"; first_status=$?',
+      'print -r -- "FIRST=$first_status"',
+      'print -r -- "RESTORED_ZSH=$ZSH:$ZSH_CUSTOM:$ZSH_CACHE_DIR:$ZSH_COMPDUMP"',
+      'print -r -- "RESTORED_PLUGINS=${(j:,:)plugins}"',
+      'print -r -- "RESTORED_REAP=${aliases[reap]}"',
+      'print -r -- "LEAKED_TEMPS=${+mzsh_init_scalar_variable}:${+mzsh_custom_plugins}:${+mzsh_plugin}:${+mzsh_seen_plugins}"',
+      'unset MZSH_TEST_FAIL_OMZ',
+      'source "$MZSH_ENTRYPOINT"; second_status=$?',
+      'print -r -- "SECOND=$second_status"',
+      'print -r -- "LOADED_OMZ=${MZSH_OH_MY_ZSH_LOADED:-absent}"',
+    ].join('\n');
+
+    const result = Bun.spawnSync([zshPath, '-fic', script], {
+      cwd: fixture,
+      env: {
+        ...portableEnvironment(),
+        HOME: join(fixture, 'home'),
+        PATH: `${join(fixture, 'system')}:/usr/bin:/bin`,
+        FPATH: '',
+        MZSH_ENTRYPOINT: join(portableRoot, 'init.zsh'),
+        MZSH_OH_MY_ZSH_ROOT: frameworkRoot,
+        MZSH_PRIVATE_ZSH: join(fixture, 'missing-private.zsh'),
+      },
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(errorOutputOf(result)).toBe('');
+    expect(outputOf(result)).toContain('FIRST=1\n');
+    expect(outputOf(result)).toContain(
+      'RESTORED_ZSH=prior-zsh:prior-custom:prior-cache:prior-compdump\n'
+    );
+    expect(outputOf(result)).toContain('RESTORED_PLUGINS=prior-p1,prior-p2\n');
+    expect(outputOf(result)).toContain('RESTORED_REAP=prior-reap\n');
+    expect(outputOf(result)).toContain('LEAKED_TEMPS=0:0:0:0\n');
+    expect(outputOf(result)).toContain('SECOND=0\n');
+    expect(outputOf(result)).toContain('LOADED_OMZ=1\n');
+  });
+
+  test('configures KEYTIMEOUT=1 or MZSH_KEYTIMEOUT override, bracketed paste, and vi-mode input stability', () => {
     const fixture = createFixture();
     const portableRoot = copyPortableRoot(fixture);
     makeDirectory(fixture, 'home');
@@ -272,7 +329,7 @@ describe('portable Zsh initialization', () => {
       'bindkey -M viins | grep -q "bracketed-paste" && print -r -- "PASTE_VIINS=bound" || print -r -- "PASTE_VIINS=unbound"',
     ].join('\n');
 
-    const result = Bun.spawnSync([zshPath, '-fic', script], {
+    const defaultResult = Bun.spawnSync([zshPath, '-fic', script], {
       cwd: fixture,
       env: {
         ...portableEnvironment(),
@@ -293,8 +350,33 @@ describe('portable Zsh initialization', () => {
       stderr: 'pipe',
     });
 
-    expect(result.exitCode).toBe(0);
-    expect(outputOf(result)).toContain('KEYTIMEOUT=1\n');
-    expect(outputOf(result)).toContain('PASTE_VIINS=bound\n');
+    expect(defaultResult.exitCode).toBe(0);
+    expect(outputOf(defaultResult)).toContain('KEYTIMEOUT=1\n');
+    expect(outputOf(defaultResult)).toContain('PASTE_VIINS=bound\n');
+
+    const overrideResult = Bun.spawnSync([zshPath, '-fic', script], {
+      cwd: fixture,
+      env: {
+        ...portableEnvironment(),
+        HOME: join(fixture, 'home'),
+        PATH: `${join(fixture, 'system')}:/usr/bin:/bin`,
+        FPATH: '',
+        MZSH_ENTRYPOINT: join(portableRoot, 'init.zsh'),
+        MZSH_KEYTIMEOUT: '25',
+        BUN_INSTALL: '',
+        NVM_DIR: '',
+        CARGO_HOME: join(fixture, 'missing-cargo'),
+        ANDROID_HOME: '',
+        ANDROID_SDK_ROOT: '',
+        MZSH_OH_MY_ZSH_ROOT: '',
+        MZSH_DOCKER_COMPLETION_DIR: '',
+        MZSH_PRIVATE_ZSH: join(fixture, 'missing-private.zsh'),
+      },
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
+
+    expect(overrideResult.exitCode).toBe(0);
+    expect(outputOf(overrideResult)).toContain('KEYTIMEOUT=25\n');
   });
 });

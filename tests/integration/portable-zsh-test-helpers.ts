@@ -37,6 +37,9 @@ export const zshPath = discoveredZshPath;
 export function portableEnvironment(): Record<string, string | undefined> {
   return {
     ...process.env,
+    ZSH: '',
+    ZSH_CUSTOM: '',
+    ZSH_CACHE_DIR: '',
     HOMEBREW_PREFIX: '',
     PNPM_HOME: '',
     MZSH_PNPM_GLOBAL_BIN: '',

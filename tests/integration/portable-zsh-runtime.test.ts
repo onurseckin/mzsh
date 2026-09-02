@@ -314,8 +314,11 @@ describe('portable Zsh runtime and completion', () => {
     const script = [
       'source "$MZSH_ENTRYPOINT" || exit 1',
       'print -r -- "COMPLETION_OWNER=$MZSH_COMPLETION_OWNER"',
+      'print -r -- "COMPLETION_INITIALIZED=$MZSH_COMPLETION_INITIALIZED"',
       'print -r -- "FRAMEWORK_COMPINIT_CALLS=$MZSH_FRAMEWORK_COMPINIT_CALLS"',
       'print -r -- "FRAMEWORK_FPATH_AT_COMPINIT=$MZSH_FRAMEWORK_FPATH_AT_COMPINIT"',
+      'print -r -- "ZSH_CACHE_DIR=$ZSH_CACHE_DIR"',
+      'print -r -- "ZSH_COMPDUMP=$ZSH_COMPDUMP"',
     ].join('\n');
     const result = Bun.spawnSync([zshPath, '-fic', script], {
       cwd: fixture,
@@ -324,6 +327,7 @@ describe('portable Zsh runtime and completion', () => {
         HOME: join(fixture, 'home'),
         PATH: `${join(fixture, 'system')}:/usr/bin:/bin`,
         FPATH: '',
+        XDG_CACHE_HOME: join(fixture, 'cache'),
         MZSH_ENTRYPOINT: entrypoint,
         MZSH_HOMEBREW_PREFIX: homebrewPrefix,
         MZSH_DOCKER_COMPLETION_DIR: dockerCompletionDirectory,
@@ -341,6 +345,7 @@ describe('portable Zsh runtime and completion', () => {
 
     expect(result.exitCode).toBe(0);
     expect(outputOf(result)).toContain('COMPLETION_OWNER=oh-my-zsh\n');
+    expect(outputOf(result)).toContain('COMPLETION_INITIALIZED=1\n');
     expect(outputOf(result)).toContain('FRAMEWORK_COMPINIT_CALLS=1\n');
     expect(outputOf(result)).toMatch(
       new RegExp(
@@ -350,5 +355,7 @@ describe('portable Zsh runtime and completion', () => {
     expect(outputOf(result)).toMatch(
       new RegExp(`FRAMEWORK_FPATH_AT_COMPINIT=.*${dockerCompletionDirectory}`)
     );
+    expect(outputOf(result)).toContain(`ZSH_CACHE_DIR=${join(fixture, 'cache', 'mzsh')}\n`);
+    expect(outputOf(result)).toContain(`ZSH_COMPDUMP=${join(fixture, 'cache', 'mzsh')}/zcompdump-`);
   });
 });

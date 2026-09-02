@@ -2,7 +2,7 @@
 [[ -o interactive ]] || return 0
 
 # Fast escape timeout for vi mode (1 centisecond = 10ms) to eliminate escape delay
-typeset -gi KEYTIMEOUT=1
+typeset -gi KEYTIMEOUT="${MZSH_KEYTIMEOUT:-1}"
 
 typeset -g ZVM_INIT_MODE=sourcing
 typeset -g ZVM_LINE_INIT_MODE=${ZVM_MODE_INSERT:-i}

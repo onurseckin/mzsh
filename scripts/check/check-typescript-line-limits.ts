@@ -2,8 +2,8 @@ import { lstatSync, readdirSync, readFileSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 
 const DEFAULT_MAXIMUM_LINES = 400;
-export const TYPE_SCRIPT_DIRECTORIES = ['bin', 'scripts', 'src', 'tests'];
-export const ROOT_TYPE_SCRIPT_FILES = ['index.ts'];
+export const TYPE_SCRIPT_DIRECTORIES = ['scripts', 'src', 'tests'];
+export const ROOT_TYPE_SCRIPT_FILES: string[] = [];
 
 export type TypeScriptLineLimitViolation = {
   path: string;

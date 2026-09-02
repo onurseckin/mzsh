@@ -6,7 +6,12 @@ export type CatalogFlag =
   | { name: 'confirm'; value: 'confirmation'; description: string; required?: boolean }
   | { name: 'json'; value: 'boolean'; description: string; required?: boolean }
   | { name: 'source'; value: 'absolute-path'; description: string; required?: boolean }
-  | { name: 'legacy-source'; value: 'absolute-path'; description: string; required?: boolean };
+  | { name: 'legacy-source'; value: 'absolute-path'; description: string; required?: boolean }
+  | { name: 'format'; value: 'format-style'; description: string; required?: boolean }
+  | { name: 'critical-path'; value: 'boolean'; description: string; required?: boolean }
+  | { name: 'simulate'; value: 'boolean'; description: string; required?: boolean }
+  | { name: 'filter'; value: 'status-filter'; description: string; required?: boolean }
+  | { name: 'workflow'; value: 'string'; description: string; required?: boolean };
 
 export type CatalogParser =
   | { kind: 'audit'; flags: readonly CatalogFlag[]; positional: 'none' }
@@ -16,6 +21,7 @@ export type CatalogParser =
   | { kind: 'bootstrap'; flags: readonly CatalogFlag[]; positional: 'none' }
   | { kind: 'update'; flags: readonly CatalogFlag[]; positional: 'none' }
   | { kind: 'rollback'; flags: readonly CatalogFlag[]; positional: 'receipt-id' }
+  | { kind: 'dag'; flags: readonly CatalogFlag[]; positional: 'optional-workflow' }
   | { kind: 'tui'; flags: readonly CatalogFlag[]; positional: 'none' }
   | { kind: 'placeholder'; flags: readonly CatalogFlag[]; positional: 'none' };
 
@@ -30,6 +36,7 @@ export type CatalogTuiMetadata = {
     { readonly screen: 'dashboard'; readonly keys: readonly ['g', 'd'] },
     { readonly screen: 'plan-review'; readonly keys: readonly ['g', 'p'] },
     { readonly screen: 'history'; readonly keys: readonly ['g', 'h'] },
+    { readonly screen: 'dag'; readonly keys: readonly ['g', 'g'] },
   ];
 };
 
@@ -114,6 +121,15 @@ export type CatalogCommand =
       palette: CatalogPaletteMetadata;
       tui: CatalogTuiMetadata;
       parser: Extract<CatalogParser, { kind: 'tui' }>;
+    }
+  | {
+      name: 'dag';
+      summary: string;
+      risk: CommandRisk;
+      available: true;
+      palette: CatalogPaletteMetadata;
+      tui: CatalogTuiMetadata;
+      parser: Extract<CatalogParser, { kind: 'dag' }>;
     };
 
 export type CatalogCommandName = CatalogCommand['name'];
@@ -124,6 +140,15 @@ export type ManagedCommand =
   | { kind: 'env'; action: 'list'; json: boolean }
   | { kind: 'env'; action: 'get'; name: string; json: boolean }
   | { kind: 'env'; action: 'set'; name: string; json: boolean }
+  | {
+      kind: 'dag';
+      workflow?: string;
+      format?: 'box' | 'tree' | 'compact';
+      criticalPath?: boolean;
+      simulate?: boolean;
+      filter?: string;
+      json: boolean;
+    }
   | { kind: 'tui' }
   | (MutationCommand & { kind: 'setup' })
   | (MutationCommand & { kind: 'bootstrap'; source: string; legacySource?: string })

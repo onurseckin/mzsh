@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { applyAdoption } from '../application/apply-adoption';
 import { ReviewedPlanApplicationService } from '../application/apply-reviewed-plan';
@@ -25,6 +26,7 @@ import { InventoryProbes } from '../infrastructure/inventory-probes';
 import { readMachineManifest } from '../infrastructure/manifest-reader';
 import { ZshPreflight } from '../infrastructure/zsh-preflight';
 import { parseArguments } from './parse-arguments';
+import { runDagCommand } from './dag-command';
 import { runEnvironmentCommand } from './environment-command';
 import { runLifecycleCommand } from './setup-command';
 import type { TuiLauncher } from '../tui/create-tui';
@@ -69,9 +71,14 @@ export interface RunMzshCliDependencies {
 }
 
 function defaultInventoryCollector(): InventoryCollector {
-  const manifest = readMachineManifest(
-    join(__dirname, '..', '..', 'manifests', 'machine-manifest.json')
-  );
+  const manifestPath = existsSync(
+    join(__dirname, '..', '..', 'docs', 'manifests', 'machine-manifest.json')
+  )
+    ? join(__dirname, '..', '..', 'docs', 'manifests', 'machine-manifest.json')
+    : existsSync(join(__dirname, '..', 'manifests', 'machine-manifest.json'))
+      ? join(__dirname, '..', 'manifests', 'machine-manifest.json')
+      : join(__dirname, '..', '..', 'manifests', 'machine-manifest.json');
+  const manifest = readMachineManifest(manifestPath);
   return new InventoryService(new CategoryRegistry(manifest.categories), [new InventoryProbes()]);
 }
 
@@ -188,6 +195,7 @@ export function runMzshCli(args: readonly string[], dependencies: RunMzshCliDepe
     return 0;
   }
   if (parsed.kind === 'env') return runEnvironmentCommand(parsed, dependencies);
+  if (parsed.kind === 'dag') return runDagCommand(parsed, dependencies);
   if (parsed.kind === 'setup') return runLifecycleCommand(parsed, dependencies);
   if (parsed.kind === 'update') return runLifecycleCommand(parsed, dependencies);
   const filesystem =

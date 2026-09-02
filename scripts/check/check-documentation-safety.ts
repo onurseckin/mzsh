@@ -1,9 +1,9 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { extname, join, relative, resolve } from 'node:path';
 
-const repoRoot = resolve(__dirname, '..');
+const repoRoot = resolve(__dirname, '../..');
 
-const scanDirectories = ['docs', 'manifests'];
+const scanDirectories = ['docs'];
 const scanFiles = [
   'README.md',
   'portable/zsh/README.md',

@@ -75,6 +75,7 @@ describe('command catalog', () => {
       'history',
       'inventory',
       'env',
+      'dag',
       'tui',
     ]);
     expect(parseCatalogArgs(['setup'])).toEqual({ kind: 'setup', apply: false });
