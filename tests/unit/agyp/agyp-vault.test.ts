@@ -1,266 +1,151 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { AgypPaths } from '../../../src/domain/agyp/agyp-paths';
 import { AgypVault } from '../../../src/domain/agyp/agyp-vault';
+import type { QuotaSnapshot } from '../../../src/domain/agyp/agyp-types';
+
+const testRoot = join(process.cwd(), '.tmp', `agyp-vault-${Date.now()}`);
+
+function makeVault(): { vault: AgypVault; paths: AgypPaths } {
+  const paths = new AgypPaths(join(testRoot, 'home'), join(testRoot, 'vault'));
+  return { vault: new AgypVault(paths), paths };
+}
+
+function snapshot(email: string, remaining: number): QuotaSnapshot {
+  return {
+    email,
+    planName: 'Pro',
+    pools: [
+      {
+        id: 'gemini',
+        label: 'Gemini',
+        remainingPercentage: remaining,
+        resetTime: null,
+        modelCount: 1,
+      },
+    ],
+    capturedAt: new Date().toISOString(),
+    source: 'live_session',
+  };
+}
 
 describe('AgypVault', () => {
-  const testRoot = join(process.cwd(), '.tmp', `test-vault-${Date.now()}`);
-  const customVault = join(testRoot, 'accounts');
-  const customGemini = join(testRoot, 'gemini');
-
   beforeEach(() => {
-    mkdirSync(customVault, { recursive: true, mode: 0o700 });
-    mkdirSync(customGemini, { recursive: true, mode: 0o700 });
+    mkdirSync(join(testRoot, 'vault'), { recursive: true, mode: 0o700 });
   });
 
   afterEach(() => {
     rmSync(testRoot, { recursive: true, force: true });
   });
 
-  test('reads empty registry by default', () => {
-    const vault = new AgypVault(customVault, customGemini);
+  test('starts empty', () => {
+    const { vault } = makeVault();
     const registry = vault.readRegistry();
-    expect(registry.version).toBe(1);
-    expect(registry.activeAccount).toBeNull();
+    expect(registry.version).toBe(2);
+    expect(registry.globalAccount).toBeNull();
     expect(registry.accounts).toHaveLength(0);
   });
 
-  test('auto-imports existing token from gemini dir', () => {
-    const fakeAccounts = {
-      primaryEmail: 'user@example.com',
-      accounts: [{ email: 'user@example.com', name: 'User' }],
-    };
-    writeFileSync(join(customGemini, 'google_accounts.json'), JSON.stringify(fakeAccounts));
-    writeFileSync(join(customGemini, 'jetski-standalone-oauth-token'), 'fake-token-content');
+  test('registers an account and adopts it as the global default', () => {
+    const { vault } = makeVault();
+    const created = vault.registerAccount('Person@Example.com');
 
-    const vault = new AgypVault(customVault, customGemini);
-    const imported = vault.autoImportExistingToken();
-
-    expect(imported).toBeTrue();
-    const accounts = vault.listAccounts();
-    expect(accounts).toHaveLength(1);
-    expect(accounts[0]?.email).toBe('user@example.com');
-    expect(vault.getActiveAccount()).toBe('user@example.com');
-
-    const envExport = vault.getEnvironmentExport('user@example.com');
-    expect(envExport).not.toBeNull();
-    expect(envExport?.exportScript).toContain('export AGY_ACCOUNT="user@example.com"');
-    expect(envExport?.exportScript).toContain('export JETSKI_STANDALONE_OAUTH_TOKEN_PATH=');
+    expect(created.email).toBe('person@example.com');
+    expect(vault.getGlobalAccount()).toBe('person@example.com');
+    expect(vault.hasAccount('PERSON@example.com')).toBeTrue();
   });
 
-  test('switches active account and updates lastUsedAt', () => {
-    const vault = new AgypVault(customVault, customGemini);
-    vault.writeRegistry({
-      version: 1,
-      activeAccount: 'first@gmail.com',
-      accounts: [
-        {
-          email: 'first@gmail.com',
-          addedAt: '2026-01-01T00:00:00Z',
-          lastUsedAt: '2026-01-01T00:00:00Z',
-        },
-        {
-          email: 'second@gmail.com',
-          addedAt: '2026-01-01T00:00:00Z',
-          lastUsedAt: '2026-01-01T00:00:00Z',
-        },
-      ],
-    });
+  test('keeps the first account as global when a second is added', () => {
+    const { vault } = makeVault();
+    vault.registerAccount('first@example.com');
+    vault.registerAccount('second@example.com');
 
-    const switched = vault.setActiveAccount('second@gmail.com');
-    expect(switched).toBeTrue();
-    expect(vault.getActiveAccount()).toBe('second@gmail.com');
+    expect(vault.getGlobalAccount()).toBe('first@example.com');
+    expect(vault.listAccounts()).toHaveLength(2);
   });
 
-  test('removes account and cleans directory', () => {
-    const vault = new AgypVault(customVault, customGemini);
-    vault.writeRegistry({
-      version: 1,
-      activeAccount: 'first@gmail.com',
-      accounts: [
-        {
-          email: 'first@gmail.com',
-          addedAt: '2026-01-01T00:00:00Z',
-          lastUsedAt: '2026-01-01T00:00:00Z',
-        },
-      ],
-    });
+  test('re-registering an existing account does not duplicate it', () => {
+    const { vault } = makeVault();
+    vault.registerAccount('person@example.com');
+    vault.registerAccount('person@example.com');
 
-    const accountDir = vault.getAccountDir('first@gmail.com');
-    mkdirSync(accountDir, { recursive: true });
-
-    const removed = vault.removeAccount('first@gmail.com');
-    expect(removed).toBeTrue();
-    expect(vault.listAccounts()).toHaveLength(0);
-    expect(vault.getActiveAccount()).toBeNull();
-  });
-
-  test('adds or updates account with token content', () => {
-    const vault = new AgypVault(customVault, customGemini);
-    const added = vault.addOrUpdateAccount('newuser@gmail.com', 'new-token-content');
-    expect(added).toBeTrue();
     expect(vault.listAccounts()).toHaveLength(1);
-    expect(vault.getActiveAccount()).toBe('newuser@gmail.com');
   });
 
-  test('preserves backup when registry.json is corrupt', () => {
-    const registryPath = join(customVault, 'registry.json');
-    writeFileSync(registryPath, 'INVALID_JSON_DATA_CORRUPT');
+  test('removing the global account promotes a survivor', () => {
+    const { vault } = makeVault();
+    vault.registerAccount('first@example.com');
+    vault.registerAccount('second@example.com');
 
-    const vault = new AgypVault(customVault, customGemini);
-    const accounts = vault.listAccounts();
-    expect(accounts).toHaveLength(0);
-
-    // Verify corrupt backup was generated
-    const files = readdirSync(customVault);
-    const corruptBackup = files.find((f) => f.startsWith('registry.json.corrupt.'));
-    expect(corruptBackup).toBeDefined();
+    expect(vault.removeAccount('first@example.com')).toBeTrue();
+    expect(vault.getGlobalAccount()).toBe('second@example.com');
   });
 
-  test('auto-imports from standalone JWT token when google_accounts.json is absent', () => {
-    // Generate sample mock JWT with email claim
-    const header = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).toString('base64');
-    const payload = Buffer.from(
-      JSON.stringify({ email: 'jwt-user@example.com', sub: '12345' })
-    ).toString('base64');
-    const signature = 'sample_signature';
-    const jwtToken = `${header}.${payload}.${signature}`;
+  test('removing the last account clears the global default', () => {
+    const { vault } = makeVault();
+    vault.registerAccount('only@example.com');
+    vault.removeAccount('only@example.com');
 
-    writeFileSync(join(customGemini, 'jetski-standalone-oauth-token'), jwtToken);
-
-    const vault = new AgypVault(customVault, customGemini);
-    const imported = vault.autoImportExistingToken();
-
-    expect(imported).toBeTrue();
-    const accounts = vault.listAccounts();
-    expect(accounts).toHaveLength(1);
-    expect(accounts[0]?.email).toBe('jwt-user@example.com');
+    expect(vault.getGlobalAccount()).toBeNull();
   });
 
-  test('auto-import is strictly idempotent and does not rewrite existing matched state', () => {
-    const fakeAccounts = {
-      primaryEmail: 'idempotent@example.com',
-      accounts: [{ email: 'idempotent@example.com' }],
-    };
-    writeFileSync(join(customGemini, 'google_accounts.json'), JSON.stringify(fakeAccounts));
-    writeFileSync(join(customGemini, 'jetski-standalone-oauth-token'), 'static-token');
-
-    const vault = new AgypVault(customVault, customGemini);
-    const firstImport = vault.autoImportExistingToken();
-    expect(firstImport).toBeTrue();
-
-    const initialRegistry = vault.readRegistry();
-    const initialAddedAt = initialRegistry.accounts[0]?.addedAt;
-
-    // Call multiple times
-    vault.autoImportExistingToken();
-    vault.listAccounts();
-    vault.getActiveAccount();
-
-    const finalRegistry = vault.readRegistry();
-    expect(finalRegistry.accounts).toHaveLength(1);
-    expect(finalRegistry.accounts[0]?.addedAt).toBe(initialAddedAt);
-  });
-
-  test('findAccount performs exact, prefix, and substring resolution', () => {
-    const vault = new AgypVault(customVault, customGemini);
-    vault.writeRegistry({
-      version: 1,
-      activeAccount: 'alice.work@corp.com',
-      accounts: [
-        {
-          email: 'alice.work@corp.com',
-          addedAt: '2026-01-01T00:00:00Z',
-          lastUsedAt: '2026-01-01T00:00:00Z',
-        },
-        {
-          email: 'bob.personal@gmail.com',
-          addedAt: '2026-01-01T00:00:00Z',
-          lastUsedAt: '2026-01-01T00:00:00Z',
-        },
-        {
-          email: 'bob.work@corp.com',
-          addedAt: '2026-01-01T00:00:00Z',
-          lastUsedAt: '2026-01-01T00:00:00Z',
-        },
-      ],
-    });
-
-    // Exact
-    const exact = vault.findAccount('alice.work@corp.com');
-    expect(exact.account?.email).toBe('alice.work@corp.com');
-
-    // Prefix unique
-    const prefix = vault.findAccount('alice');
-    expect(prefix.account?.email).toBe('alice.work@corp.com');
-
-    // Substring unique
-    const substr = vault.findAccount('personal');
-    expect(substr.account?.email).toBe('bob.personal@gmail.com');
-
-    // Ambiguous prefix
-    const ambiguous = vault.findAccount('bob');
-    expect(ambiguous.account).toBeNull();
-    expect(ambiguous.error).toContain('Ambiguous');
-
-    // Unknown
-    const unknown = vault.findAccount('charlie');
-    expect(unknown.account).toBeNull();
-    expect(unknown.error).toContain('not found in vault');
-  });
-
-  test('canonicalizes email casing and trims token whitespace', () => {
-    const vault = new AgypVault(customVault, customGemini);
-    vault.addOrUpdateAccount('  User.NAME@Example.COM  ', '  token-with-newlines\n\n  ');
-
-    expect(vault.getActiveAccount()).toBe('user.name@example.com');
-    const accounts = vault.listAccounts();
-    expect(accounts).toHaveLength(1);
-    expect(accounts[0]?.email).toBe('user.name@example.com');
-
-    const tokenContent = readFileSync(vault.getTokenPath('User.NAME@Example.COM'), 'utf8');
-    expect(tokenContent).toBe('token-with-newlines');
-
-    // Switch using different casing
-    const switched = vault.setActiveAccount('USER.NAME@EXAMPLE.COM');
-    expect(switched).toBeTrue();
-  });
-
-  test('syncs active account token, google_accounts and oauth_creds to global gemini dir', () => {
-    const vault = new AgypVault(customVault, customGemini);
-    vault.addOrUpdateAccount(
-      'alice@example.com',
-      'token-alice',
-      JSON.stringify({ active: 'alice@example.com' }),
-      JSON.stringify({ access_token: 'oauth-alice', email: 'alice@example.com' })
+  test('reads a version 1 registry as a version 2 one', () => {
+    const { vault, paths } = makeVault();
+    writeFileSync(
+      paths.registryPath,
+      JSON.stringify({
+        version: 1,
+        activeAccount: 'legacy@example.com',
+        accounts: [
+          {
+            email: 'legacy@example.com',
+            addedAt: '2026-01-01T00:00:00Z',
+            lastUsedAt: '2026-01-01T00:00:00Z',
+          },
+        ],
+      })
     );
 
-    const globalToken = join(customGemini, 'jetski-standalone-oauth-token');
-    const globalAccounts = join(customGemini, 'google_accounts.json');
-    const globalOauth = join(customGemini, 'oauth_creds.json');
+    const registry = vault.readRegistry();
+    expect(registry.version).toBe(2);
+    expect(registry.globalAccount).toBe('legacy@example.com');
+    expect(registry.accounts).toHaveLength(1);
+  });
 
-    expect(existsSync(globalToken)).toBeTrue();
-    expect(readFileSync(globalToken, 'utf8')).toBe('token-alice');
-    expect(existsSync(globalAccounts)).toBeTrue();
-    expect(readFileSync(globalAccounts, 'utf8')).toContain('alice@example.com');
-    expect(existsSync(globalOauth)).toBeTrue();
-    expect(readFileSync(globalOauth, 'utf8')).toContain('oauth-alice');
+  test('preserves an unreadable registry instead of discarding it', () => {
+    const { vault, paths } = makeVault();
+    writeFileSync(paths.registryPath, '{ not json');
 
-    // Add second account and switch
-    vault.addOrUpdateAccount(
-      'bob@example.com',
-      'token-bob',
-      JSON.stringify({ active: 'bob@example.com' }),
-      JSON.stringify({ access_token: 'oauth-bob', email: 'bob@example.com' })
-    );
+    expect(vault.listAccounts()).toHaveLength(0);
+    const preserved = readFileSync(paths.registryPath, 'utf8');
+    expect(preserved).toBe('{ not json');
+  });
 
-    expect(readFileSync(globalToken, 'utf8')).toBe('token-bob');
-    expect(readFileSync(globalAccounts, 'utf8')).toContain('bob@example.com');
+  test('remembers and recalls a quota reading, marking it cached', () => {
+    const { vault } = makeVault();
+    vault.rememberQuota(snapshot('person@example.com', 42));
 
-    // Switch back to alice
-    vault.setActiveAccount('alice@example.com');
-    expect(readFileSync(globalToken, 'utf8')).toBe('token-alice');
-    expect(readFileSync(globalAccounts, 'utf8')).toContain('alice@example.com');
-    expect(readFileSync(globalOauth, 'utf8')).toContain('oauth-alice');
+    const recalled = vault.recallQuota('person@example.com');
+    expect(recalled?.pools[0]?.remainingPercentage).toBe(42);
+    expect(recalled?.source).toBe('cache');
+  });
+
+  test('forgets the quota reading when an account is removed', () => {
+    const { vault } = makeVault();
+    vault.registerAccount('person@example.com');
+    vault.rememberQuota(snapshot('person@example.com', 42));
+    vault.removeAccount('person@example.com');
+
+    expect(vault.recallQuota('person@example.com')).toBeNull();
+  });
+
+  test('matches accounts by prefix', () => {
+    const { vault } = makeVault();
+    vault.registerAccount('work.person@example.com');
+    vault.registerAccount('home.person@example.com');
+
+    expect(vault.findAccount('work').account?.email).toBe('work.person@example.com');
+    expect(vault.findAccount('person').error).toContain('Ambiguous');
   });
 });

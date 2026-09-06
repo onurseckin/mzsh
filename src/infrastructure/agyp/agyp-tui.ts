@@ -1,7 +1,6 @@
 import { closeSync, existsSync, openSync } from 'node:fs';
 import process from 'node:process';
 import { ReadStream as TtyReadStream, WriteStream as TtyWriteStream } from 'node:tty';
-import type { AccountMetadata } from '../../domain/agyp/agyp-types';
 import {
   ANSI_CLEAR_SCREEN,
   ANSI_CURSOR_HIDE,
@@ -12,228 +11,213 @@ import {
   type TerminalInputStream,
   type TerminalOutputStream,
 } from '../terminal-cleanup';
+import {
+  AGYP_TUI_KEY_HINTS,
+  formatRow,
+  formatScopeHeader,
+  type AgypTuiRow,
+} from './agyp-tui-render';
 
-export const AGYP_ACTION_LOGIN = '__ACTION_LOGIN__';
+export type AgypTuiAction =
+  | { kind: 'use'; email: string }
+  | { kind: 'global'; email: string }
+  | { kind: 'remove'; email: string }
+  | { kind: 'login' }
+  | { kind: 'refresh' }
+  | { kind: 'cancel' };
 
-interface MenuItem {
-  type: 'account' | 'login';
-  email?: string;
-  label: string;
+export interface AgypTuiModel {
+  rows: readonly AgypTuiRow[];
+  sessionAccount: string | null;
+  globalAccount: string | null;
+  notice: string | null;
+}
+
+interface TtyHandles {
+  input: TerminalInputStream;
+  output: TerminalOutputStream;
+  inputFd: number | null;
+  outputFd: number | null;
+}
+
+function openTty(): TtyHandles | null {
+  if (process.stdin.isTTY && process.stdout.isTTY) {
+    return { input: process.stdin, output: process.stdout, inputFd: null, outputFd: null };
+  }
+  // `agyp` is normally called from a shell function that captures stdout, so
+  // the controlling terminal has to be reopened explicitly to drive the menu.
+  if (!existsSync('/dev/tty')) {
+    return null;
+  }
+  try {
+    const inputFd = openSync('/dev/tty', 'r');
+    const outputFd = openSync('/dev/tty', 'w');
+    return {
+      input: new TtyReadStream(inputFd),
+      output: new TtyWriteStream(outputFd),
+      inputFd,
+      outputFd,
+    };
+  } catch {
+    return null;
+  }
 }
 
 export class AgypTui {
-  public static async selectAccount(
-    accounts: AccountMetadata[],
-    activeAccount: string | null
-  ): Promise<string | null> {
-    let ttyIn: TerminalInputStream | null = null;
-    let ttyOut: TerminalOutputStream | null = null;
-    let customInFd: number | null = null;
-    let customOutFd: number | null = null;
+  public static isAvailable(): boolean {
+    return (process.stdin.isTTY && process.stdout.isTTY) || existsSync('/dev/tty');
+  }
 
-    if (process.stdin.isTTY && process.stdout.isTTY) {
-      ttyIn = process.stdin;
-      ttyOut = process.stdout;
-    } else if (existsSync('/dev/tty')) {
-      try {
-        customInFd = openSync('/dev/tty', 'r');
-        customOutFd = openSync('/dev/tty', 'w');
-        ttyIn = new TtyReadStream(customInFd);
-        ttyOut = new TtyWriteStream(customOutFd);
-      } catch {
-        // Fallback
+  public static async present(model: AgypTuiModel): Promise<AgypTuiAction> {
+    const handles = openTty();
+    if (!handles) {
+      return { kind: 'cancel' };
+    }
+    const { input, output, inputFd, outputFd } = handles;
+
+    let selectedIndex = model.rows.findIndex((row) => row.isSession);
+    if (selectedIndex === -1) {
+      selectedIndex = model.rows.findIndex((row) => row.isGlobal);
+    }
+    if (selectedIndex === -1) {
+      selectedIndex = 0;
+    }
+
+    const render = (): void => {
+      const columns = output.columns ?? process.stdout.columns ?? 100;
+      output.write(ANSI_CLEAR_SCREEN);
+      output.write('\x1b[1;36mAntigravity accounts\x1b[0m\n\n');
+      for (const line of formatScopeHeader(model.sessionAccount, model.globalAccount)) {
+        output.write(`${line}\n`);
       }
-    }
+      output.write('\n');
 
-    if (!ttyIn || !ttyOut) {
-      return activeAccount ?? accounts[0]?.email ?? null;
-    }
-
-    const items: MenuItem[] = accounts.map((acc) => ({
-      type: 'account',
-      email: acc.email,
-      label: acc.email,
-    }));
-
-    items.push({
-      type: 'login',
-      label: '+ Login & Add New Account...',
-    });
-
-    let selectedIndex = 0;
-    if (activeAccount) {
-      const idx = items.findIndex((item) => item.email === activeAccount);
-      if (idx !== -1) selectedIndex = idx;
-    }
-
-    const render = () => {
-      if (!ttyOut) return;
-      const cols = ttyOut.columns ?? process.stdout.columns ?? 80;
-      ttyOut.write(ANSI_CLEAR_SCREEN);
-      ttyOut.write('\x1b[1;36m? Select active Antigravity account:\x1b[0m\n\n');
-
-      items.forEach((item, i) => {
-        const isSelected = i === selectedIndex;
-        const cursor = isSelected ? '\x1b[1;32m> \x1b[0m' : '  ';
-        const numShortcut = i < 9 ? `\x1b[2;37m${i + 1}. \x1b[0m` : '   ';
-
-        if (item.type === 'account') {
-          const isActive = item.email === activeAccount;
-          const activeMarker = isActive ? '\x1b[1;32m* \x1b[0m' : '  ';
-          const activeSuffix = isActive ? ' \x1b[2;32m(active)\x1b[0m' : '';
-          const overhead = 2 + 3 + 2 + (isActive ? 9 : 0);
-          const maxLabelWidth = Math.max(10, cols - overhead);
-
-          let displayLabel = item.label;
-          if (displayLabel.length > maxLabelWidth) {
-            displayLabel = `${displayLabel.slice(0, Math.max(3, maxLabelWidth - 3))}...`;
-          }
-
-          const label = isSelected
-            ? `\x1b[1;37;4m${displayLabel}\x1b[0m`
-            : `\x1b[37m${displayLabel}\x1b[0m`;
-          ttyOut.write(`${cursor}${numShortcut}${activeMarker}${label}${activeSuffix}\n`);
-        } else {
-          const overhead = 2 + 3 + 2;
-          const maxLabelWidth = Math.max(10, cols - overhead);
-          let displayLabel = item.label;
-          if (displayLabel.length > maxLabelWidth) {
-            displayLabel = `${displayLabel.slice(0, Math.max(3, maxLabelWidth - 3))}...`;
-          }
-
-          const label = isSelected
-            ? `\x1b[1;33;4m${displayLabel}\x1b[0m`
-            : `\x1b[33m${displayLabel}\x1b[0m`;
-          ttyOut.write(`${cursor}${numShortcut}  ${label}\n`);
-        }
+      if (model.rows.length === 0) {
+        output.write('  \x1b[2;37mNo accounts yet. Press [n] to sign in to one.\x1b[0m\n');
+      }
+      model.rows.forEach((row, index) => {
+        output.write(`${formatRow(row, index, index === selectedIndex, columns)}\n`);
       });
 
-      ttyOut.write(
-        '\n\x1b[2;37m[↑/↓/j/k/1-9] Navigate  •  [Enter/Space] Select  •  [q/Esc] Cancel\x1b[0m\n'
-      );
+      if (model.notice !== null) {
+        output.write(`\n  \x1b[33m${model.notice}\x1b[0m\n`);
+      }
+      output.write(`\n\x1b[2;37m${AGYP_TUI_KEY_HINTS}\x1b[0m\n`);
     };
 
-    return new Promise((resolve) => {
-      // Enter alternate screen buffer and hide cursor
-      ttyOut.write(`${ANSI_ENTER_ALT_SCREEN}${ANSI_CURSOR_HIDE}`);
-
-      if (typeof ttyIn.setRawMode === 'function') {
+    return new Promise<AgypTuiAction>((resolve) => {
+      output.write(`${ANSI_ENTER_ALT_SCREEN}${ANSI_CURSOR_HIDE}`);
+      if (typeof input.setRawMode === 'function') {
         try {
-          ttyIn.setRawMode(true);
+          input.setRawMode(true);
         } catch {
-          // ignore
+          // Not every stream honours raw mode; navigation still works.
         }
       }
-      if (typeof ttyIn.resume === 'function') {
-        ttyIn.resume();
-      }
-
+      input.resume?.();
       render();
 
       let cleanedUp = false;
       let unregisterTraps: (() => void) | null = null;
 
-      const cleanup = () => {
-        if (cleanedUp) return;
+      const cleanup = (): void => {
+        if (cleanedUp) {
+          return;
+        }
         cleanedUp = true;
-
-        if (unregisterTraps) {
-          unregisterTraps();
-          unregisterTraps = null;
-        }
-
-        if (ttyIn && typeof ttyIn.removeListener === 'function') {
-          ttyIn.removeListener('data', onData);
-        }
-
-        restoreTerminalState({
-          input: ttyIn,
-          output: ttyOut,
-        });
-
-        if (customInFd !== null) {
+        unregisterTraps?.();
+        unregisterTraps = null;
+        input.removeListener?.('data', onData);
+        restoreTerminalState({ input, output });
+        if (inputFd !== null) {
           try {
-            ttyIn?.destroy?.();
-            closeSync(customInFd);
+            input.destroy?.();
+            closeSync(inputFd);
           } catch {
-            // ignore
+            // Already closed.
           }
         }
-        if (customOutFd !== null) {
+        if (outputFd !== null) {
           try {
-            ttyOut?.destroy?.();
-            closeSync(customOutFd);
+            output.destroy?.();
+            closeSync(outputFd);
           } catch {
-            // ignore
+            // Already closed.
           }
         }
       };
 
-      const handleSignal = () => {
+      const finish = (action: AgypTuiAction): void => {
         cleanup();
-        resolve(null);
+        resolve(action);
       };
 
       unregisterTraps = registerTerminalSignalTraps({
-        onSignal: handleSignal,
+        onSignal: () => finish({ kind: 'cancel' }),
         onResize: render,
-        onCrash: handleSignal,
+        onCrash: () => finish({ kind: 'cancel' }),
         cleanup,
-        input: ttyIn,
-        output: ttyOut,
+        input,
+        output,
       });
 
-      const onData = (chunk: unknown) => {
+      const selectedEmail = (): string | null => model.rows[selectedIndex]?.email ?? null;
+
+      const onData = (chunk: unknown): void => {
+        if (!Buffer.isBuffer(chunk)) {
+          return;
+        }
         try {
-          if (!Buffer.isBuffer(chunk)) {
-            return;
-          }
-          const keys = sanitizeKeySequence(chunk);
-          for (const key of keys) {
-            // Up: ANSI (\x1b[A), SS3 (\x1bOA), 'k', Ctrl+P (\x10)
+          for (const key of sanitizeKeySequence(chunk)) {
             if (key === '\x1b[A' || key === '\x1bOA' || key === 'k' || key === '\x10') {
-              selectedIndex = (selectedIndex - 1 + items.length) % items.length;
-              render();
-            }
-            // Down: ANSI (\x1b[B), SS3 (\x1bOB), 'j', Ctrl+N (\x0e)
-            else if (key === '\x1b[B' || key === '\x1bOB' || key === 'j' || key === '\x0e') {
-              selectedIndex = (selectedIndex + 1) % items.length;
-              render();
-            }
-            // Direct numeric jump (1 - 9)
-            else if (/^[1-9]$/.test(key)) {
-              const targetIdx = parseInt(key, 10) - 1;
-              if (targetIdx >= 0 && targetIdx < items.length) {
-                selectedIndex = targetIdx;
+              if (model.rows.length > 0) {
+                selectedIndex = (selectedIndex - 1 + model.rows.length) % model.rows.length;
                 render();
               }
-            }
-            // Select: Enter (\r, \n) or Space (' ')
-            else if (key === '\r' || key === '\n' || key === ' ') {
-              cleanup();
-              const chosen = items[selectedIndex];
-              if (chosen?.type === 'login') {
-                resolve(AGYP_ACTION_LOGIN);
-              } else {
-                resolve(chosen?.email ?? null);
+            } else if (key === '\x1b[B' || key === '\x1bOB' || key === 'j' || key === '\x0e') {
+              if (model.rows.length > 0) {
+                selectedIndex = (selectedIndex + 1) % model.rows.length;
+                render();
               }
+            } else if (/^[1-9]$/.test(key)) {
+              const target = Number.parseInt(key, 10) - 1;
+              if (target < model.rows.length) {
+                selectedIndex = target;
+                render();
+              }
+            } else if (key === '\r' || key === '\n' || key === ' ') {
+              const email = selectedEmail();
+              finish(email === null ? { kind: 'cancel' } : { kind: 'use', email });
               return;
-            }
-            // Cancel: Escape (\x1b), 'q', Ctrl+C (\x03)
-            else if (key === '\x1b' || key === 'q' || key === '\x03') {
-              cleanup();
-              resolve(null);
+            } else if (key === 'g') {
+              const email = selectedEmail();
+              if (email !== null) {
+                finish({ kind: 'global', email });
+                return;
+              }
+            } else if (key === 'x') {
+              const email = selectedEmail();
+              if (email !== null) {
+                finish({ kind: 'remove', email });
+                return;
+              }
+            } else if (key === 'n') {
+              finish({ kind: 'login' });
+              return;
+            } else if (key === 'r') {
+              finish({ kind: 'refresh' });
+              return;
+            } else if (key === '\x1b' || key === 'q' || key === '\x03') {
+              finish({ kind: 'cancel' });
               return;
             }
           }
         } catch {
-          // Prevent any unhandled data parsing error from crashing TUI
+          // A malformed escape sequence must never take the menu down.
         }
       };
 
-      if (ttyIn && typeof ttyIn.on === 'function') {
-        ttyIn.on('data', onData);
-      }
+      input.on?.('data', onData);
     });
   }
 }

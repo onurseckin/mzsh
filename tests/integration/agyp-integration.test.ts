@@ -1,120 +1,267 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { spawnSync } from 'node:child_process';
-import { chmodSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { AgypPaths } from '../../src/domain/agyp/agyp-paths';
 import { AgypVault } from '../../src/domain/agyp/agyp-vault';
-import { AgypService } from '../../src/infrastructure/agyp/agyp-service';
+import { AgypKeychain } from '../../src/infrastructure/agyp/agyp-keychain';
+import { AgypShadowHome } from '../../src/infrastructure/agyp/agyp-shadow-home';
 
-describe('agyp multi-account integration', () => {
-  const testRoot = join(process.cwd(), '.tmp', `test-agyp-int-${Date.now()}`);
-  const customVault = join(testRoot, 'accounts');
-  const customGemini = join(testRoot, 'gemini');
+const testRoot = join(process.cwd(), '.tmp', `agyp-integration-${Date.now()}`);
+const fakeRealHome = join(testRoot, 'home');
+const fakeSecurity = join(import.meta.dir, '..', 'fixtures', 'fake-security.sh');
 
+function seedRealHome(): void {
+  mkdirSync(join(fakeRealHome, 'Library', 'Keychains'), { recursive: true });
+  mkdirSync(join(fakeRealHome, 'Library', 'Caches'), { recursive: true });
+  mkdirSync(join(fakeRealHome, 'Library', 'Preferences'), { recursive: true });
+  writeFileSync(join(fakeRealHome, 'Library', 'Preferences', 'com.example.app.plist'), 'x');
+  writeFileSync(
+    join(fakeRealHome, 'Library', 'Preferences', 'com.apple.security.plist'),
+    'real-search-list'
+  );
+  mkdirSync(join(fakeRealHome, '.config'), { recursive: true });
+  writeFileSync(join(fakeRealHome, '.gitconfig'), '[user]\n');
+  writeFileSync(join(fakeRealHome, 'Library', 'Keychains', 'login.keychain-db'), '');
+  writeFileSync(join(fakeRealHome, 'Library', 'Keychains', 'login.keychain-db.items'), '');
+  mkdirSync(join(fakeRealHome, '.gemini'), { recursive: true });
+}
+
+function build(): { paths: AgypPaths; shadow: AgypShadowHome; keychain: AgypKeychain } {
+  const paths = new AgypPaths(fakeRealHome, join(testRoot, 'vault'));
+  const keychain = new AgypKeychain(fakeSecurity);
+  return { paths, keychain, shadow: new AgypShadowHome(paths, keychain) };
+}
+
+describe('agyp shadow home', () => {
   beforeEach(() => {
-    mkdirSync(customVault, { recursive: true, mode: 0o700 });
-    mkdirSync(customGemini, { recursive: true, mode: 0o700 });
+    mkdirSync(testRoot, { recursive: true });
+    seedRealHome();
   });
 
   afterEach(() => {
     rmSync(testRoot, { recursive: true, force: true });
   });
 
-  test('full multi-account onboarding and switching lifecycle', async () => {
-    // 1. Initial global token state
-    const fakeAccounts = {
-      primaryEmail: 'onurseckinsenoglu@gmail.com',
-      accounts: [{ email: 'onurseckinsenoglu@gmail.com' }],
-    };
-    writeFileSync(join(customGemini, 'google_accounts.json'), JSON.stringify(fakeAccounts));
-    writeFileSync(join(customGemini, 'jetski-standalone-oauth-token'), 'token-primary');
+  test('mirrors the real home as symlinks', () => {
+    const { paths, shadow } = build();
+    shadow.ensure('person@example.com', true);
+    const home = paths.shadowHome('person@example.com');
 
-    const vault = new AgypVault(customVault, customGemini);
-    const service = new AgypService(vault);
-
-    // 2. Add second account
-    const secondDir = vault.getAccountDir('onurssenoglu@gmail.com');
-    mkdirSync(secondDir, { recursive: true });
-    writeFileSync(vault.getTokenPath('onurssenoglu@gmail.com'), 'token-secondary');
-
-    const registry = vault.readRegistry();
-    registry.accounts.push({
-      email: 'onurssenoglu@gmail.com',
-      addedAt: new Date().toISOString(),
-      lastUsedAt: new Date().toISOString(),
-    });
-    vault.writeRegistry(registry);
-
-    // 3. List accounts
-    const listResult = service.listAccounts();
-    expect(listResult.success).toBeTrue();
-    expect(listResult.payload).toContain('onurseckinsenoglu@gmail.com');
-    expect(listResult.payload).toContain('onurssenoglu@gmail.com');
-
-    // 4. Switch to second account
-    const switchResult = await service.pickOrSwitch('onurssenoglu@gmail.com');
-    expect(switchResult.success).toBeTrue();
-    expect(switchResult.action).toBe('export');
-    expect(switchResult.payload).toContain('export AGY_ACCOUNT="onurssenoglu@gmail.com"');
-    expect(switchResult.payload).toContain('jetski-standalone-oauth-token');
-
-    // 5. Verify current active account
-    const currentResult = service.currentAccount();
-    expect(currentResult.success).toBeTrue();
-    expect(currentResult.payload).toBe('onurssenoglu@gmail.com');
+    for (const entry of ['.gitconfig', '.config', '.gemini']) {
+      expect(lstatSync(join(home, entry)).isSymbolicLink()).toBeTrue();
+    }
+    // Shared history is the point: .gemini must resolve back to the real one.
+    expect(readFileSync(join(home, '.gitconfig'), 'utf8')).toBe('[user]\n');
   });
 
-  test('end-to-end zsh shell session integration and agy delegation', () => {
-    const fakeHome = join(testRoot, 'home');
-    const fakeGemini = join(fakeHome, '.gemini');
-    const fakeAccountsDir = join(fakeGemini, 'accounts');
-    const fakeLocalBin = join(fakeHome, '.local', 'bin');
-    mkdirSync(fakeAccountsDir, { recursive: true, mode: 0o700 });
-    mkdirSync(fakeLocalBin, { recursive: true, mode: 0o700 });
+  test('keeps Library/Keychains real while linking the rest of Library', () => {
+    const { paths, shadow } = build();
+    shadow.ensure('person@example.com', true);
+    const library = join(paths.shadowHome('person@example.com'), 'Library');
 
-    const vault = new AgypVault(fakeAccountsDir, fakeGemini);
-    vault.addOrUpdateAccount('alice.work@corp.com', 'alice-token');
-    vault.addOrUpdateAccount('bob.personal@gmail.com', 'bob-token');
-    vault.setActiveAccount('alice.work@corp.com');
+    expect(lstatSync(join(library, 'Caches')).isSymbolicLink()).toBeTrue();
+    expect(lstatSync(join(library, 'Keychains')).isDirectory()).toBeTrue();
+    expect(lstatSync(join(library, 'Keychains')).isSymbolicLink()).toBeFalse();
+    expect(existsSync(paths.shadowKeychain('person@example.com'))).toBeTrue();
+  });
 
-    const mockAgy = join(fakeLocalBin, 'agy');
-    writeFileSync(
-      mockAgy,
-      '#!/bin/sh\nprintf "MOCK_AGY_TOKEN:%s\\n" "$JETSKI_STANDALONE_OAUTH_TOKEN_PATH"\n',
-      { mode: 0o755 }
+  test('owns its keychain search list instead of writing through to the real home', () => {
+    const { paths, shadow } = build();
+    shadow.ensure('person@example.com', true);
+    const preferences = join(paths.shadowHome('person@example.com'), 'Library', 'Preferences');
+
+    // Real preferences stay shared...
+    expect(lstatSync(join(preferences, 'com.example.app.plist')).isSymbolicLink()).toBeTrue();
+    // ...but the search list must never be a link back into the real home, or
+    // selecting an account would repoint the user's own login keychain.
+    expect(existsSync(join(preferences, 'com.apple.security.plist'))).toBeFalse();
+    expect(
+      readFileSync(join(fakeRealHome, 'Library', 'Preferences', 'com.apple.security.plist'), 'utf8')
+    ).toBe('real-search-list');
+  });
+
+  test('creates the account keychain under the sandbox home', () => {
+    const { paths, shadow } = build();
+    shadow.ensure('person@example.com', true);
+
+    // create-keychain appends to the caller's search list, so it has to run
+    // with HOME pointed at the sandbox or it edits the user's real one.
+    expect(existsSync(paths.shadowKeychain('person@example.com'))).toBeTrue();
+    expect(existsSync(join(fakeRealHome, 'Library', 'Preferences', 'search-list'))).toBeFalse();
+  });
+
+  test('points the sandbox default keychain at the account keychain', () => {
+    const { paths, shadow, keychain } = build();
+    const report = shadow.ensure('person@example.com', true);
+
+    // Reads follow the search list, but agy stores without naming a keychain,
+    // which targets the default. Both have to point at the account.
+    expect(report.defaultKeychainApplied).toBeTrue();
+    expect(keychain.readDefaultKeychain(paths.shadowHome('person@example.com'))).toBe(
+      paths.shadowKeychain('person@example.com')
     );
-    chmodSync(mockAgy, 0o755);
+  });
 
-    const agypZshModule = join(process.cwd(), 'portable', 'zsh', 'modules', 'agyp.zsh');
+  test('never names an account keychain login.keychain-db', () => {
+    const { paths, shadow, keychain } = build();
+    shadow.ensure('person@example.com', true);
+    const keychainPath = paths.shadowKeychain('person@example.com');
 
-    const zshScript = `
-export HOME="${fakeHome}"
-export PATH="${fakeLocalBin}:$PATH"
-source "${agypZshModule}"
+    // macOS reserves that name and ignores the creation password, which would
+    // make the account keychain unopenable without prompting.
+    expect(keychainPath.endsWith('login.keychain-db')).toBeFalse();
+    expect(keychain.unlockKeychain(keychainPath)).toBeTrue();
+  });
 
-# Verify active account routing before switch
-agy
+  test('layered mode puts the account keychain ahead of the login keychain', () => {
+    const { paths, shadow, keychain } = build();
+    shadow.ensure('person@example.com', true);
 
-# Switch to bob via fuzzy prefix
-agyp bob
+    const searchList = keychain.readSearchList(paths.shadowHome('person@example.com'));
+    expect(searchList[0]).toBe(paths.shadowKeychain('person@example.com'));
+    expect(searchList[1]).toBe(paths.realKeychain);
+  });
 
-# Print exported shell state and call agy again
-printf "EXPORTED_AGY_ACCOUNT:%s\\n" "$AGY_ACCOUNT"
-agy
-`;
+  test('strict mode isolates the account keychain completely', () => {
+    const { paths, shadow, keychain } = build();
+    shadow.ensure('person@example.com', false);
 
-    const res = spawnSync('zsh', ['-f', '-i', '-c', zshScript], {
-      env: {
-        ...process.env,
-        HOME: fakeHome,
-        PATH: `${fakeLocalBin}:${process.env.PATH}`,
-      },
-      encoding: 'utf8',
-    });
+    const searchList = keychain.readSearchList(paths.shadowHome('person@example.com'));
+    expect(searchList).toEqual([paths.shadowKeychain('person@example.com')]);
+  });
 
-    expect(res.status).toBe(0);
-    expect(res.stdout).toContain('MOCK_AGY_TOKEN:' + vault.getTokenPath('alice.work@corp.com'));
-    expect(res.stdout).toContain('bob.personal@gmail.com');
-    expect(res.stdout).toContain('EXPORTED_AGY_ACCOUNT:bob.personal@gmail.com');
-    expect(res.stdout).toContain('MOCK_AGY_TOKEN:' + vault.getTokenPath('bob.personal@gmail.com'));
+  test('is idempotent across repeated switches', () => {
+    const { paths, shadow } = build();
+    const first = shadow.ensure('person@example.com', true);
+    const second = shadow.ensure('person@example.com', true);
+
+    expect(first.topLevelLinks).toBeGreaterThan(0);
+    expect(second.topLevelLinks).toBe(0);
+    expect(existsSync(paths.shadowKeychain('person@example.com'))).toBeTrue();
+  });
+
+  test('picks up directories added to the real home after the farm was built', () => {
+    const { paths, shadow } = build();
+    shadow.ensure('person@example.com', true);
+    mkdirSync(join(fakeRealHome, '.newtool'), { recursive: true });
+
+    shadow.ensure('person@example.com', true);
+    expect(
+      lstatSync(join(paths.shadowHome('person@example.com'), '.newtool')).isSymbolicLink()
+    ).toBeTrue();
+  });
+
+  test('reports files an agy session wrote inside the sandbox', () => {
+    const { paths, shadow } = build();
+    shadow.ensure('person@example.com', true);
+    writeFileSync(join(paths.shadowHome('person@example.com'), '.strayrc'), 'x');
+
+    expect(shadow.strayEntries('person@example.com')).toEqual(['.strayrc']);
+  });
+});
+
+describe('agyp credential storage', () => {
+  beforeEach(() => {
+    mkdirSync(testRoot, { recursive: true });
+    seedRealHome();
+  });
+
+  afterEach(() => {
+    rmSync(testRoot, { recursive: true, force: true });
+  });
+
+  test('each account keeps its own credential', () => {
+    const { paths, shadow, keychain } = build();
+    shadow.ensure('first@example.com', true);
+    shadow.ensure('second@example.com', true);
+
+    keychain.writeCredential(paths.shadowKeychain('first@example.com'), 'credential-one');
+    keychain.writeCredential(paths.shadowKeychain('second@example.com'), 'credential-two');
+
+    expect(keychain.readCredential(paths.shadowKeychain('first@example.com'))).toBe(
+      'credential-one'
+    );
+    expect(keychain.readCredential(paths.shadowKeychain('second@example.com'))).toBe(
+      'credential-two'
+    );
+  });
+
+  test('switching accounts never rewrites the login keychain', () => {
+    const { paths, shadow, keychain } = build();
+    keychain.createKeychain(paths.realKeychain, fakeRealHome);
+    keychain.writeCredential(paths.realKeychain, 'original-global');
+
+    shadow.ensure('person@example.com', true);
+    keychain.writeCredential(paths.shadowKeychain('person@example.com'), 'account-credential');
+
+    expect(keychain.readCredential(paths.realKeychain)).toBe('original-global');
+  });
+
+  test('a stored credential is returned byte for byte', () => {
+    const { paths, shadow, keychain } = build();
+    shadow.ensure('person@example.com', true);
+    const blob = 'go-keyring-base64:eyJ0b2tlbiI6e319';
+
+    keychain.writeCredential(paths.shadowKeychain('person@example.com'), blob);
+    expect(keychain.readCredential(paths.shadowKeychain('person@example.com'))).toBe(blob);
+  });
+
+  test('turns off auto-locking when wiring a sandbox', () => {
+    const { paths, shadow } = build();
+    shadow.ensure('person@example.com', true);
+
+    // macOS creates keychains with lock-on-sleep and a 5 minute idle timeout.
+    // Once locked, any read raises a GUI prompt at the user.
+    expect(existsSync(`${paths.shadowKeychain('person@example.com')}.nolock`)).toBeTrue();
+  });
+
+  test('reads a locked account keychain without prompting', () => {
+    const { paths, shadow, keychain } = build();
+    shadow.ensure('person@example.com', true);
+    const keychainPath = paths.shadowKeychain('person@example.com');
+    keychain.writeCredential(keychainPath, 'credential');
+
+    // Simulate the keychain having locked after a reboot or a long idle.
+    writeFileSync(`${keychainPath}.locked`, '');
+    expect(keychain.readCredential(keychainPath)).toBe('credential');
+  });
+
+  test('reports a missing credential rather than throwing', () => {
+    const { paths, shadow, keychain } = build();
+    shadow.ensure('person@example.com', true);
+
+    expect(keychain.hasCredential(paths.shadowKeychain('person@example.com'))).toBeFalse();
+    expect(keychain.readCredential(paths.shadowKeychain('person@example.com'))).toBeNull();
+  });
+
+  test('unwraps the go-keyring envelope without touching plain payloads', () => {
+    const wrapped = `go-keyring-base64:${Buffer.from('{"token":{"expiry":"2026-09-06T08:44:41Z"}}').toString('base64')}`;
+    expect(AgypKeychain.readCredentialExpiry(wrapped)).toBe('2026-09-06T08:44:41Z');
+    expect(AgypKeychain.decodeCredential('{"token":{}}')).toBe('{"token":{}}');
+  });
+});
+
+describe('agyp vault and shadow home together', () => {
+  beforeEach(() => {
+    mkdirSync(testRoot, { recursive: true });
+    seedRealHome();
+  });
+
+  afterEach(() => {
+    rmSync(testRoot, { recursive: true, force: true });
+  });
+
+  test('forgetting an account deletes its sandbox', () => {
+    const { paths, shadow } = build();
+    const vault = new AgypVault(paths);
+    vault.registerAccount('person@example.com');
+    shadow.ensure('person@example.com', true);
+
+    expect(existsSync(paths.shadowHome('person@example.com'))).toBeTrue();
+    vault.removeAccount('person@example.com');
+    shadow.remove('person@example.com');
+
+    expect(existsSync(paths.accountDir('person@example.com'))).toBeFalse();
+    expect(vault.listAccounts()).toHaveLength(0);
   });
 });

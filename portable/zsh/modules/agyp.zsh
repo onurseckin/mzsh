@@ -1,81 +1,86 @@
-# Antigravity Multi-Account Switcher & Environment Router
+# Antigravity account manager and per-shell agy router
 [[ -o interactive ]] || return 0
 
-function agyp() {
-  local agyp_bin=""
-  
-  agyp_bin="$(whence -p agyp 2>/dev/null)"
-
-  if [[ -z "$agyp_bin" || ! -f "$agyp_bin" ]]; then
-    if [[ -f "$HOME/.local/bin/agyp" ]]; then
-      agyp_bin="$HOME/.local/bin/agyp"
-    elif [[ -f "${0:A:h}/../../../bin/agyp.ts" ]]; then
-      agyp_bin="${0:A:h}/../../../bin/agyp.ts"
-    fi
+function _agyp_binary() {
+  local resolved
+  resolved="$(whence -p agyp 2>/dev/null)"
+  if [[ -n "$resolved" && -f "$resolved" ]]; then
+    print -r -- "$resolved"
+    return 0
   fi
+  if [[ -f "$HOME/.local/bin/agyp" ]]; then
+    print -r -- "$HOME/.local/bin/agyp"
+    return 0
+  fi
+  if [[ -f "${0:A:h}/../../../bin/agyp.ts" ]]; then
+    print -r -- "${0:A:h}/../../../bin/agyp.ts"
+    return 0
+  fi
+  return 1
+}
 
-  if [[ -z "$agyp_bin" || ! -f "$agyp_bin" ]]; then
+function agyp() {
+  local agyp_bin
+  if ! agyp_bin="$(_agyp_binary)"; then
     print -u2 -- "mzsh: agyp executable not found in PATH"
     return 1
   fi
 
-  local cmd_output
+  # The menu draws on /dev/tty; stdout carries only shell assignments.
+  local cmd_output exit_code
   if [[ "$agyp_bin" == *.ts ]]; then
     cmd_output=$(bun "$agyp_bin" "$@")
   else
     cmd_output=$("$agyp_bin" "$@")
   fi
-  local exit_code=$?
+  exit_code=$?
 
-  if (( exit_code == 0 )); then
-    if [[ "$cmd_output" == *"export AGY_ACCOUNT="* || "$cmd_output" == *"unset AGY_ACCOUNT"* ]]; then
-      local line
-      while IFS= read -r line; do
-        if [[ "$line" == export\ * || "$line" == unset\ * ]]; then
-          eval "$line"
-        elif [[ -n "$line" ]]; then
-          print -- "$line"
-        fi
-      done <<< "$cmd_output"
-      if [[ -n "${AGY_ACCOUNT:-}" ]]; then
-        print -- "\x1b[1;32m✓\x1b[0m Active Antigravity account is \x1b[1;37m$AGY_ACCOUNT\x1b[0m"
-      elif [[ "$cmd_output" == *"unset AGY_ACCOUNT"* ]]; then
-        print -- "\x1b[1;33mℹ\x1b[0m Cleared active Antigravity account"
-      fi
-    elif [[ -n "$cmd_output" ]]; then
-      print -- "$cmd_output"
-    fi
-  elif [[ -n "$cmd_output" ]]; then
-    print -u2 -- "$cmd_output"
+  if (( exit_code != 0 )); then
+    [[ -n "$cmd_output" ]] && print -u2 -- "$cmd_output"
+    return $exit_code
   fi
 
-  return $exit_code
+  local line
+  while IFS= read -r line; do
+    case "$line" in
+      export\ AGYP_*|unset\ AGYP_*|unset\ JETSKI_*)
+        eval "$line"
+        ;;
+      '')
+        ;;
+      *)
+        print -r -- "$line"
+        ;;
+    esac
+  done <<< "$cmd_output"
+
+  if [[ "$cmd_output" == *"export AGYP_ACCOUNT="* && -n "${AGYP_ACCOUNT:-}" ]]; then
+    print -- "\x1b[1;32m✓\x1b[0m This shell now uses \x1b[1;37m${AGYP_ACCOUNT}\x1b[0m"
+  fi
+
+  return 0
 }
 
 function agy() {
-  # Sanitize terminal line discipline against flow-control lockups (Ctrl-S/Q) and delayed suspend (Ctrl-Y)
+  # Guard the line discipline against flow-control lockups (Ctrl-S/Q) and
+  # delayed suspend (Ctrl-Y), which agy's full-screen mode cannot recover from.
   stty -ixon -ixoff -tostop dsusp undef 2>/dev/null || true
 
-  local target_token=""
-  if [[ -n "${JETSKI_STANDALONE_OAUTH_TOKEN_PATH:-}" && "$JETSKI_STANDALONE_OAUTH_TOKEN_PATH" == "$HOME"/* && -f "$JETSKI_STANDALONE_OAUTH_TOKEN_PATH" ]]; then
-    target_token="$JETSKI_STANDALONE_OAUTH_TOKEN_PATH"
-  elif [[ -n "${AGY_ACCOUNT:-}" && -f "$HOME/.gemini/accounts/$AGY_ACCOUNT/jetski-standalone-oauth-token" ]]; then
-    target_token="$HOME/.gemini/accounts/$AGY_ACCOUNT/jetski-standalone-oauth-token"
-  elif [[ -f "$HOME/.gemini/accounts/registry.json" ]]; then
-    local active_acc=""
-    active_acc=$(grep -o '"activeAccount"[[:space:]]*:[[:space:]]*"[^"]*"' "$HOME/.gemini/accounts/registry.json" 2>/dev/null | sed -E 's/.*"([^"]+)"$/\1/')
-    if [[ -n "$active_acc" && "$active_acc" != "null" && -f "$HOME/.gemini/accounts/$active_acc/jetski-standalone-oauth-token" ]]; then
-      target_token="$HOME/.gemini/accounts/$active_acc/jetski-standalone-oauth-token"
-    fi
-  elif [[ -f "$HOME/.gemini/jetski-standalone-oauth-token" ]]; then
-    target_token="$HOME/.gemini/jetski-standalone-oauth-token"
+  # No account bound to this shell: run against the global default untouched.
+  if [[ -z "${AGYP_HOME:-}" || ! -d "$AGYP_HOME" ]]; then
+    command agy "$@"
+    return $?
   fi
 
-  if [[ -n "$target_token" ]]; then
-    JETSKI_STANDALONE_OAUTH_TOKEN_PATH="$target_token" command agy "$@"
-  else
-    command agy "$@"
+  # agy resolves both ~/.gemini and its keychain search list from HOME, so the
+  # sandbox home is the whole switch. Unlock first: the account keychain has an
+  # empty password precisely so this never raises a GUI prompt.
+  local account_keychain="$AGYP_HOME/Library/Keychains/agyp.keychain-db"
+  if [[ -f "$account_keychain" ]]; then
+    /usr/bin/security unlock-keychain -p '' "$account_keychain" 2>/dev/null || true
   fi
+
+  HOME="$AGYP_HOME" command agy "$@"
 }
 
 return 0

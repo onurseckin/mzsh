@@ -1,6 +1,16 @@
 /**
- * Antigravity Multi-Account Vault Types & Schemas
+ * Antigravity multi-account vault types.
+ *
+ * The credential `agy` actually reads is a macOS generic password
+ * (service `gemini`, account `antigravity`) resolved from `$HOME`, not the
+ * `jetski-standalone-oauth-token` file. Every type here is shaped around that.
  */
+
+export const KEYCHAIN_SERVICE = 'gemini';
+export const KEYCHAIN_ACCOUNT = 'antigravity';
+
+/** zalando/go-keyring wraps non-trivial secrets with this marker before base64. */
+export const GO_KEYRING_BASE64_PREFIX = 'go-keyring-base64:';
 
 export interface AccountMetadata {
   email: string;
@@ -9,28 +19,67 @@ export interface AccountMetadata {
 }
 
 export interface AccountRegistry {
+  version: 2;
+  /** Account mirrored into the real login keychain, used by the IDE and unwrapped `agy`. */
+  globalAccount: string | null;
+  accounts: AccountMetadata[];
+}
+
+/** Registry as written by the pre-shadow-home implementation. */
+export interface LegacyAccountRegistry {
   version: 1;
   activeAccount: string | null;
   accounts: AccountMetadata[];
 }
 
-export interface GoogleAccountProfile {
-  email?: string;
-  name?: string;
-  picture?: string;
+/**
+ * Antigravity meters two independent pools. Every Gemini model shares one
+ * allowance and one reset instant; Claude and GPT-OSS share another.
+ */
+export type QuotaPoolId = 'gemini' | 'premium';
+
+export interface QuotaPool {
+  id: QuotaPoolId;
+  label: string;
+  /** 0-100. Absent `remainingFraction` in the payload means exactly zero. */
+  remainingPercentage: number;
+  resetTime: string | null;
+  modelCount: number;
 }
 
-export interface GoogleAccountsPayload {
-  active?: string;
-  primaryEmail?: string;
-  accounts?: GoogleAccountProfile[];
-  old?: string[];
+export type QuotaSource = 'live_session' | 'spawned_probe' | 'cache';
+
+export interface QuotaSnapshot {
+  email: string;
+  planName: string | null;
+  pools: QuotaPool[];
+  capturedAt: string;
+  source: QuotaSource;
+}
+
+export interface QuotaCache {
+  version: 1;
+  snapshots: Record<string, QuotaSnapshot>;
+}
+
+/** A running `agy` process discovered through its loopback language-server port. */
+export interface LiveSession {
+  pid: number;
+  port: number;
+  email: string;
 }
 
 export interface AgypEnvironmentExport {
   email: string;
-  tokenPath: string;
+  shadowHome: string;
   exportScript: string;
+}
+
+export interface AgypScopeState {
+  /** Account bound to the invoking shell via `AGYP_ACCOUNT`. */
+  sessionAccount: string | null;
+  /** Account mirrored into the real login keychain. */
+  globalAccount: string | null;
 }
 
 export interface AgypResult {
@@ -39,5 +88,3 @@ export interface AgypResult {
   action?: 'export' | 'print' | 'none';
   payload?: string;
 }
-
-export type AgypAuthExecutor = (stagingTokenPath: string) => boolean | Promise<boolean>;

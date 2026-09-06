@@ -1,300 +1,231 @@
-import { spawnSync, type StdioOptions } from 'node:child_process';
-import { closeSync, existsSync, mkdirSync, openSync, readFileSync, rmSync } from 'node:fs';
-import { join } from 'node:path';
+import { AgypPaths } from '../../domain/agyp/agyp-paths';
 import { AgypVault } from '../../domain/agyp/agyp-vault';
-import { AgypTui, AGYP_ACTION_LOGIN } from './agyp-tui';
+import { formatResetHint } from '../../domain/agyp/agyp-quota';
 import type {
-  AgypAuthExecutor,
+  AgypEnvironmentExport,
   AgypResult,
-  GoogleAccountsPayload,
+  AgypScopeState,
 } from '../../domain/agyp/agyp-types';
+import { AgypKeychain } from './agyp-keychain';
+import { AgypShadowHome } from './agyp-shadow-home';
+import { AgypQuotaProbe } from './agyp-quota-probe';
+import { AgypQuotaService, type AccountQuota } from './agyp-quota-service';
+import { AgypProvisioning } from './agyp-provisioning';
+
+const SESSION_ACCOUNT_VARIABLE = 'AGYP_ACCOUNT';
+
+export interface AccountHealth {
+  email: string;
+  keychainPath: string;
+  hasCredential: boolean;
+  credentialExpiry: string | null;
+  sandboxReady: boolean;
+  strayEntries: string[];
+}
+
+export interface AgypServiceDependencies {
+  paths?: AgypPaths;
+  vault?: AgypVault;
+  keychain?: AgypKeychain;
+  shadowHome?: AgypShadowHome;
+  probe?: AgypQuotaProbe;
+  quota?: AgypQuotaService;
+  provisioning?: AgypProvisioning;
+}
 
 export class AgypService {
-  private readonly vault: AgypVault;
-  private readonly authExecutor?: AgypAuthExecutor;
+  public readonly paths: AgypPaths;
+  public readonly vault: AgypVault;
+  public readonly quota: AgypQuotaService;
+  private readonly keychain: AgypKeychain;
+  private readonly shadowHome: AgypShadowHome;
+  private readonly provisioning: AgypProvisioning;
 
-  constructor(vault?: AgypVault, authExecutor?: AgypAuthExecutor) {
-    this.vault = vault ?? new AgypVault();
-    this.authExecutor = authExecutor;
+  constructor(dependencies: AgypServiceDependencies = {}) {
+    this.paths = dependencies.paths ?? new AgypPaths();
+    this.vault = dependencies.vault ?? new AgypVault(this.paths);
+    this.keychain = dependencies.keychain ?? new AgypKeychain();
+    this.shadowHome = dependencies.shadowHome ?? new AgypShadowHome(this.paths, this.keychain);
+    const probe = dependencies.probe ?? new AgypQuotaProbe();
+    this.quota = dependencies.quota ?? new AgypQuotaService(this.paths, this.vault, probe);
+    this.provisioning =
+      dependencies.provisioning ??
+      new AgypProvisioning(this.paths, this.vault, this.keychain, this.shadowHome, probe);
   }
 
-  public async pickOrSwitch(targetQuery?: string): Promise<AgypResult> {
-    const accounts = this.vault.listAccounts();
+  /**
+   * Layered mode keeps the real login keychain in each shadow home's search
+   * list so tooling run inside an agy session still reaches unrelated secrets
+   * such as the git credential helper. Strict mode isolates completely.
+   */
+  public get layered(): boolean {
+    return process.env.AGYP_KEYCHAIN_MODE !== 'strict';
+  }
 
-    let selectedEmail: string | null = null;
-
-    if (targetQuery) {
-      const found = this.vault.findAccount(targetQuery);
-      if (!found.account) {
-        return {
-          success: false,
-          message: found.error ?? `Account "${targetQuery}" not found in vault.`,
-        };
-      }
-      selectedEmail = found.account.email;
-    } else {
-      selectedEmail = await AgypTui.selectAccount(accounts, this.vault.getActiveAccount());
-    }
-
-    if (!selectedEmail) {
-      return { success: false, message: 'Account selection cancelled.' };
-    }
-
-    if (selectedEmail === AGYP_ACTION_LOGIN) {
-      return this.loginAccount();
-    }
-
-    const exportData = this.vault.getEnvironmentExport(selectedEmail);
-    if (!exportData) {
-      return {
-        success: false,
-        message: `Account "${selectedEmail}" not found in vault.`,
-      };
-    }
-
-    this.vault.setActiveAccount(selectedEmail);
-
+  public readScope(): AgypScopeState {
+    const sessionAccount = process.env[SESSION_ACCOUNT_VARIABLE];
     return {
-      success: true,
-      action: 'export',
-      payload: exportData.exportScript,
+      sessionAccount:
+        sessionAccount !== undefined && sessionAccount.trim().length > 0
+          ? sessionAccount.trim().toLowerCase()
+          : null,
+      globalAccount: this.vault.getGlobalAccount(),
     };
   }
 
-  public async loginAccount(
-    suggestedEmail?: string,
-    customExecutor?: AgypAuthExecutor
-  ): Promise<AgypResult> {
-    const stagingDir = join(
-      this.vault.getVaultRoot(),
-      `.staging_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
-    );
-    mkdirSync(stagingDir, { recursive: true, mode: 0o700 });
-    const stagingGeminiDir = join(stagingDir, '.gemini');
-    mkdirSync(stagingGeminiDir, { recursive: true, mode: 0o700 });
-    const stagingToken = join(stagingGeminiDir, 'jetski-standalone-oauth-token');
-
-    let ttyInFd: number | null = null;
-    let ttyOutFd: number | null = null;
-
-    try {
-      const executor = customExecutor ?? this.authExecutor;
-      if (executor) {
-        await executor(stagingToken);
-      } else {
-        console.error(
-          '\n\x1b[1;36m🔑 Opening Antigravity login for new account in browser...\x1b[0m\n'
-        );
-
-        let childStdio: StdioOptions = 'inherit';
-        if (existsSync('/dev/tty')) {
-          try {
-            if (!process.stdin.isTTY) {
-              ttyInFd = openSync('/dev/tty', 'r');
-            }
-            if (!process.stdout.isTTY) {
-              ttyOutFd = openSync('/dev/tty', 'w');
-            }
-            if (ttyInFd !== null || ttyOutFd !== null) {
-              childStdio = [
-                ttyInFd !== null ? ttyInFd : 'inherit',
-                ttyOutFd !== null ? ttyOutFd : 'inherit',
-                'inherit',
-              ];
-            }
-          } catch {
-            // Fallback to default inherit
-          }
-        }
-
-        // Launch agy with isolated HOME so it triggers browser OAuth and writes to stagingGeminiDir
-        spawnSync('agy', ['--print', 'login_success'], {
-          stdio: childStdio,
-          env: {
-            ...process.env,
-            HOME: stagingDir,
-          },
-        });
-      }
-
-      let finalTokenPath = stagingToken;
-      if (!existsSync(finalTokenPath)) {
-        const fallbackStagingToken = join(stagingDir, 'jetski-standalone-oauth-token');
-        if (existsSync(fallbackStagingToken)) {
-          finalTokenPath = fallbackStagingToken;
-        }
-      }
-
-      if (!existsSync(finalTokenPath)) {
-        return {
-          success: false,
-          message: 'Login was not completed or token file was not written.',
-        };
-      }
-
-      const tokenContent = readFileSync(finalTokenPath, 'utf8');
-      let googleAccountsContent: string | undefined;
-      const stagingGoogleAccounts = join(stagingGeminiDir, 'google_accounts.json');
-      if (existsSync(stagingGoogleAccounts)) {
-        googleAccountsContent = readFileSync(stagingGoogleAccounts, 'utf8');
-      }
-
-      let oauthCredsContent: string | undefined;
-      const stagingOauthCreds = join(stagingGeminiDir, 'oauth_creds.json');
-      if (existsSync(stagingOauthCreds)) {
-        oauthCredsContent = readFileSync(stagingOauthCreds, 'utf8');
-      }
-
-      let email = suggestedEmail;
-      if (!email && googleAccountsContent) {
-        try {
-          const parsed = JSON.parse(googleAccountsContent) as GoogleAccountsPayload;
-          email = parsed.active ?? parsed.primaryEmail ?? parsed.accounts?.[0]?.email;
-        } catch {
-          // ignore
-        }
-      }
-
-      if (!email && oauthCredsContent) {
-        try {
-          const parsed = JSON.parse(oauthCredsContent) as { id_token?: string; email?: string };
-          if (parsed.email && parsed.email.includes('@')) {
-            email = parsed.email;
-          } else if (parsed.id_token) {
-            email = this.vault.extractEmailFromJwt(parsed.id_token) ?? undefined;
-          }
-        } catch {
-          // ignore
-        }
-      }
-
-      if (!email) {
-        email = this.vault.extractEmailFromToken(tokenContent) ?? undefined;
-      }
-
-      if (!email) {
-        email = `account_${Date.now()}`;
-      }
-
-      this.vault.addOrUpdateAccount(email, tokenContent, googleAccountsContent, oauthCredsContent);
-      this.vault.setActiveAccount(email);
-      const exportData = this.vault.getEnvironmentExport(email);
-
-      return {
-        success: true,
-        action: 'export',
-        payload: exportData?.exportScript,
-        message: `Successfully authenticated and added "${email}" to Antigravity vault.`,
-      };
-    } finally {
-      if (ttyInFd !== null) {
-        try {
-          closeSync(ttyInFd);
-        } catch {
-          // ignore
-        }
-      }
-      if (ttyOutFd !== null) {
-        try {
-          closeSync(ttyOutFd);
-        } catch {
-          // ignore
-        }
-      }
-      if (existsSync(stagingDir)) {
-        rmSync(stagingDir, { recursive: true, force: true });
-      }
-    }
-  }
-
-  public addAccount(email: string, tokenContent: string): AgypResult {
-    this.vault.addOrUpdateAccount(email, tokenContent);
-    const exportData = this.vault.getEnvironmentExport(email);
+  public buildEnvironmentExport(email: string): AgypEnvironmentExport {
+    const canonical = this.vault.canonicalizeEmail(email);
+    const shadowHome = this.paths.shadowHome(canonical);
     return {
-      success: true,
-      action: 'export',
-      payload: exportData?.exportScript,
+      email: canonical,
+      shadowHome,
+      exportScript: [
+        `export ${SESSION_ACCOUNT_VARIABLE}="${canonical}"`,
+        `export AGYP_HOME="${shadowHome}"`,
+        'unset JETSKI_STANDALONE_OAUTH_TOKEN_PATH',
+      ].join('\n'),
     };
   }
 
-  public listAccounts(): AgypResult {
-    const accounts = this.vault.listAccounts();
-    const active = this.vault.getActiveAccount();
-
-    if (accounts.length === 0) {
-      return {
-        success: true,
-        action: 'print',
-        payload: 'No registered accounts found. Run `agyp login` to add an account.',
-      };
-    }
-
-    const lines = accounts.map((acc) => {
-      const marker = acc.email === active ? '* ' : '  ';
-      const suffix = acc.email === active ? ' (active)' : '';
-      return `${marker}${acc.email}${suffix}`;
-    });
-
-    return {
-      success: true,
-      action: 'print',
-      payload: lines.join('\n'),
-    };
-  }
-
-  public currentAccount(): AgypResult {
-    const active = this.vault.getActiveAccount();
-    if (!active) {
-      return { success: false, message: 'No active account set.' };
-    }
-    return {
-      success: true,
-      action: 'print',
-      payload: active,
-    };
-  }
-
-  public removeAccount(emailQuery: string): AgypResult {
-    const found = this.vault.findAccount(emailQuery);
+  private resolveQuery(query: string): { email?: string; error?: string } {
+    const found = this.vault.findAccount(query);
     if (!found.account) {
+      return { error: found.error ?? `Account "${query}" is not in the vault.` };
+    }
+    return { email: found.account.email };
+  }
+
+  /** Binds an account to the calling shell by emitting shell assignments. */
+  public useAccount(query: string): AgypResult {
+    const resolved = this.resolveQuery(query);
+    if (resolved.email === undefined) {
+      return { success: false, message: resolved.error };
+    }
+    const email = resolved.email;
+
+    this.shadowHome.ensure(email, this.layered);
+    const keychainPath = this.paths.shadowKeychain(email);
+    if (!this.keychain.hasCredential(keychainPath)) {
       return {
         success: false,
-        message: found.error ?? `Account "${emailQuery}" not found.`,
+        message: `No stored credential for ${email}. Run \`agyp login\` to sign in again.`,
       };
     }
+    this.keychain.unlockKeychain(keychainPath);
+    this.vault.touchAccount(email);
 
-    const targetEmail = found.account.email;
-    const activeBefore = this.vault.getActiveAccount();
-    const wasActive = activeBefore === targetEmail;
+    return {
+      success: true,
+      action: 'export',
+      payload: this.buildEnvironmentExport(email).exportScript,
+    };
+  }
 
-    const removed = this.vault.removeAccount(targetEmail);
-    if (!removed) {
-      return { success: false, message: `Account "${targetEmail}" not found.` };
+  /**
+   * Mirrors an account into the real login keychain so the Antigravity IDE and
+   * any `agy` invoked outside the wrapper resolve to it.
+   */
+  public syncGlobal(query: string): AgypResult {
+    const resolved = this.resolveQuery(query);
+    if (resolved.email === undefined) {
+      return { success: false, message: resolved.error };
     }
+    const email = resolved.email;
 
-    if (wasActive) {
-      const newActive = this.vault.getActiveAccount();
-      if (newActive) {
-        const exportData = this.vault.getEnvironmentExport(newActive);
-        return {
-          success: true,
-          action: 'export',
-          payload: exportData?.exportScript,
-          message: `Removed account "${targetEmail}" from vault. Switched active account to "${newActive}".`,
-        };
-      }
-      return {
-        success: true,
-        action: 'export',
-        payload: 'unset AGY_ACCOUNT\nunset JETSKI_STANDALONE_OAUTH_TOKEN_PATH',
-        message: `Removed account "${targetEmail}" from vault. No registered accounts remaining.`,
-      };
+    const blob = this.keychain.readCredential(this.paths.shadowKeychain(email));
+    if (blob === null) {
+      return { success: false, message: `No stored credential for ${email}.` };
     }
+    if (!this.keychain.writeCredential(this.paths.realKeychain, blob)) {
+      return { success: false, message: `Could not write ${email} into the login keychain.` };
+    }
+    this.vault.setGlobalAccount(email);
 
     return {
       success: true,
       action: 'print',
-      payload: `Removed account "${targetEmail}" from vault.`,
+      payload: `Global default is now ${email}. The Antigravity IDE picks this up on its next start.`,
     };
+  }
+
+  public async login(): Promise<AgypResult> {
+    const outcome = await this.provisioning.login(this.layered);
+    if (!outcome.success || outcome.email === undefined) {
+      return { success: false, message: outcome.message };
+    }
+    return {
+      success: true,
+      action: 'export',
+      payload: this.buildEnvironmentExport(outcome.email).exportScript,
+      message: outcome.message,
+    };
+  }
+
+  public async importCurrent(): Promise<AgypResult> {
+    const outcome = await this.provisioning.importCurrent(this.layered);
+    return outcome.success
+      ? { success: true, action: 'print', payload: outcome.message }
+      : { success: false, message: outcome.message };
+  }
+
+  public removeAccount(query: string): AgypResult {
+    const resolved = this.resolveQuery(query);
+    if (resolved.email === undefined) {
+      return { success: false, message: resolved.error };
+    }
+    const email = resolved.email;
+    const wasGlobal = this.vault.getGlobalAccount() === email;
+
+    this.vault.removeAccount(email);
+    this.shadowHome.remove(email);
+
+    const replacement = this.vault.getGlobalAccount();
+    if (wasGlobal && replacement !== null) {
+      this.syncGlobal(replacement);
+    }
+
+    const suffix =
+      wasGlobal && replacement !== null ? ` Global default moved to ${replacement}.` : '';
+    return { success: true, action: 'print', payload: `Removed ${email}.${suffix}` };
+  }
+
+  /**
+   * Confirms every account's credential is actually on disk and readable.
+   *
+   * The sandbox keychain is the only copy of a sign-in, so this is the check
+   * that answers "would I have to log in again?" without having to try it.
+   */
+  public inspectAccounts(): AccountHealth[] {
+    return this.vault.listAccounts().map((account) => {
+      const keychainPath = this.paths.shadowKeychain(account.email);
+      const blob = this.keychain.readCredential(keychainPath);
+      return {
+        email: account.email,
+        keychainPath,
+        hasCredential: blob !== null,
+        credentialExpiry: blob === null ? null : AgypKeychain.readCredentialExpiry(blob),
+        sandboxReady: this.shadowHome.exists(account.email),
+        strayEntries: this.shadowHome.strayEntries(account.email),
+      };
+    });
+  }
+
+  public async gatherQuota(allowSpawn: boolean): Promise<AccountQuota[]> {
+    const emails = this.vault.listAccounts().map((account) => account.email);
+    return this.quota.gather(emails, { allowSpawn });
+  }
+
+  /** One-line quota digest used by the list view and the status header. */
+  public static describeQuota(entry: AccountQuota): string {
+    if (!entry.snapshot) {
+      return 'quota unknown';
+    }
+    const parts = entry.snapshot.pools.map((pool) => {
+      const hint = formatResetHint(pool.resetTime);
+      const suffix = hint.length > 0 ? ` (${hint})` : '';
+      return `${pool.label} ${pool.remainingPercentage}%${suffix}`;
+    });
+    const staleness = entry.snapshot.source === 'cache' ? ' [cached]' : '';
+    return `${parts.join('  ')}${staleness}`;
   }
 }
