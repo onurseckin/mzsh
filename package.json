@@ -27,7 +27,7 @@
     "format:check": "oxfmt --check .",
     "shell:check": "mise exec -- bash scripts/check/check-shell-quality.sh",
     "line:check": "bun scripts/check/check-typescript-line-limits.ts",
-    "safety:check": "bun scripts/check/check-no-suppressions.ts && bun scripts/check/check-documentation-safety.ts",
+    "safety:check": "bun scripts/check/check-no-suppressions.ts && bun scripts/check/check-documentation-safety.ts && bun scripts/check/check-test-environment-isolation.ts",
     "quality:check": "bun run lint && bun run format:check && bun run shell:check && bun run line:check && bun run safety:check",
     "test:unit": "bun test --no-isolate tests/unit",
     "test:integration": "bun test tests/integration",

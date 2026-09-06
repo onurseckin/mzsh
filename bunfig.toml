@@ -1,0 +1,4 @@
+[test]
+# Every test process starts inside a throwaway HOME so nothing under test can
+# reach the real keychain, ~/.agyp, or ~/.config. See tests/preload-isolation.ts.
+preload = ["./tests/preload-isolation.ts"]
