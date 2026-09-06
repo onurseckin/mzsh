@@ -25,6 +25,8 @@ export interface TerminalOutputStream {
   rows?: number;
   write(buffer: string | Uint8Array): boolean;
   destroy?(): void;
+  on?(event: string, listener: (...args: unknown[]) => void): this;
+  removeListener?(event: string, listener: (...args: unknown[]) => void): this;
 }
 
 export interface TerminalRestoreOptions {
