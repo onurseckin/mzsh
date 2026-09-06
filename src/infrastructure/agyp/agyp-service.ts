@@ -1,6 +1,12 @@
 import { AgypPaths } from '../../domain/agyp/agyp-paths';
 import { AgypVault } from '../../domain/agyp/agyp-vault';
 import { formatResetHint } from '../../domain/agyp/agyp-quota';
+import {
+  chooseBestAccount,
+  decideAutoSwitch,
+  type AccountQuotaView,
+  type AutoSwitchOutcome,
+} from '../../domain/agyp/agyp-selection';
 import type {
   AgypEnvironmentExport,
   AgypResult,
@@ -207,6 +213,41 @@ export class AgypService {
         strayEntries: this.shadowHome.strayEntries(account.email),
       };
     });
+  }
+
+  public static toQuotaViews(entries: readonly AccountQuota[]): AccountQuotaView[] {
+    return entries.map((entry) => ({
+      email: entry.email,
+      remainingPercentage: entry.snapshot?.gemini?.remainingPercentage ?? null,
+    }));
+  }
+
+  public async chooseBest(
+    allowSpawn: boolean,
+    minimumPercentage?: number
+  ): Promise<{ entries: AccountQuota[]; best: AccountQuotaView | null }> {
+    const entries = await this.gatherQuota(allowSpawn);
+    return {
+      entries,
+      best: chooseBestAccount(AgypService.toQuotaViews(entries), minimumPercentage),
+    };
+  }
+
+  /**
+   * Works out whether this shell should move to a different account, without
+   * performing the move; the caller decides, so a dry run stays possible.
+   */
+  public async planAutoSwitch(
+    allowSpawn: boolean,
+    threshold: number
+  ): Promise<{ entries: AccountQuota[]; outcome: AutoSwitchOutcome }> {
+    const entries = await this.gatherQuota(allowSpawn);
+    const scope = this.readScope();
+    const current = scope.sessionAccount ?? scope.globalAccount;
+    return {
+      entries,
+      outcome: decideAutoSwitch(current, AgypService.toQuotaViews(entries), threshold),
+    };
   }
 
   public async gatherQuota(allowSpawn: boolean): Promise<AccountQuota[]> {
