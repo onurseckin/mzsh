@@ -20,6 +20,12 @@ export const KEYCHAIN_ACCOUNT = 'antigravity';
  */
 export const MIRROR_SERVICE = 'agyp';
 
+/**
+ * Mirror account under which a sign-in whose identity could not be read is
+ * kept until `agyp claim <email>` attaches it. One slot: the newest wins.
+ */
+export const PENDING_MIRROR_ACCOUNT = 'pending';
+
 /** zalando/go-keyring wraps non-trivial secrets with this marker before base64. */
 export const GO_KEYRING_BASE64_PREFIX = 'go-keyring-base64:';
 

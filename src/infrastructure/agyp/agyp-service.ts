@@ -176,8 +176,11 @@ export class AgypService {
     };
   }
 
-  public async login(): Promise<AgypResult> {
-    const outcome = await this.provisioning.login(this.layered);
+  private exportOutcome(outcome: {
+    success: boolean;
+    email?: string;
+    message: string;
+  }): AgypResult {
     if (!outcome.success || outcome.email === undefined) {
       return { success: false, message: outcome.message };
     }
@@ -187,6 +190,14 @@ export class AgypService {
       payload: this.buildEnvironmentExport(outcome.email).exportScript,
       message: outcome.message,
     };
+  }
+
+  public async login(email?: string): Promise<AgypResult> {
+    return this.exportOutcome(await this.provisioning.login(this.layered, email));
+  }
+
+  public async claim(email: string): Promise<AgypResult> {
+    return this.exportOutcome(await this.provisioning.claim(email, this.layered));
   }
 
   public async importCurrent(): Promise<AgypResult> {

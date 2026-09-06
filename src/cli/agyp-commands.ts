@@ -135,8 +135,22 @@ export const AGYP_COMMANDS: readonly AgypCommandSpec[] = [
     name: 'login',
     aliases: [],
     summary: 'Sign in to an additional account. Needs a terminal.',
+    argument: {
+      name: 'email',
+      required: false,
+      summary: 'Used only if the account cannot be read from the sign-in itself.',
+    },
     options: [JSON_OPTION, HELP_OPTION],
-    examples: ['agyp login'],
+    examples: ['agyp login', 'agyp login person@example.com'],
+    mutates: true,
+  },
+  {
+    name: 'claim',
+    aliases: [],
+    summary: 'Attach a kept sign-in whose account could not be identified.',
+    argument: { name: 'email', required: true, summary: 'Account the kept sign-in belongs to.' },
+    options: [JSON_OPTION, HELP_OPTION],
+    examples: ['agyp claim person@example.com'],
     mutates: true,
   },
   {

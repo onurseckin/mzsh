@@ -18,7 +18,15 @@ const BARE_CONSTRUCTIONS = [
   'new AgypPaths()',
   'new AgypService()',
   'new AgypQuotaProbe()',
-  'new AgypProvisioning(',
+];
+
+/**
+ * Constructions that are only safe with an explicit stand-in on the same line.
+ * AgypProvisioning's sixth argument defaults to the real `agy`, which would
+ * launch an interactive sign-in from inside a test run.
+ */
+const GUARDED_CONSTRUCTIONS: readonly { construction: string; requires: string }[] = [
+  { construction: 'new AgypProvisioning(', requires: 'agyBinary' },
 ];
 
 const FORBIDDEN_LITERALS = ['/usr/bin/security', "'agy'", 'agy models'];
@@ -57,6 +65,15 @@ function scan(path: string): Violation[] {
           path,
           line: index + 1,
           detail: `${construction} uses the real home and keychain; pass fake paths and the fake security fixture`,
+        });
+      }
+    }
+    for (const guarded of GUARDED_CONSTRUCTIONS) {
+      if (text.includes(guarded.construction) && !text.includes(guarded.requires)) {
+        violations.push({
+          path,
+          line: index + 1,
+          detail: `${guarded.construction} must be given a stand-in binary (${guarded.requires}) or it would launch the real agy`,
         });
       }
     }

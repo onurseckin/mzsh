@@ -191,12 +191,24 @@ export class AgypHandlers {
     };
   }
 
-  public async login(): Promise<CommandOutcome> {
-    const result = await this.service.login();
+  public async login(email?: string): Promise<CommandOutcome> {
+    const result = await this.service.login(email);
     if (!result.success) {
       return failure(result.message ?? 'Sign-in did not complete.');
     }
-    return this.fromResult(result, { account: this.service.readScope().globalAccount });
+    return this.fromResult(result, {
+      accounts: this.service.vault.listAccounts().map((a) => a.email),
+    });
+  }
+
+  public async claim(email: string): Promise<CommandOutcome> {
+    const result = await this.service.claim(email);
+    if (!result.success) {
+      return failure(result.message ?? 'Nothing was claimed.');
+    }
+    return this.fromResult(result, {
+      accounts: this.service.vault.listAccounts().map((a) => a.email),
+    });
   }
 
   public async importCurrent(): Promise<CommandOutcome> {

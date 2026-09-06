@@ -4,6 +4,7 @@ import { AgypPaths } from '../../../src/domain/agyp/agyp-paths';
 import { AgypVault } from '../../../src/domain/agyp/agyp-vault';
 import type { LiveSession, QuotaSnapshot } from '../../../src/domain/agyp/agyp-types';
 import { AgypKeychain } from '../../../src/infrastructure/agyp/agyp-keychain';
+import { AgypProvisioning } from '../../../src/infrastructure/agyp/agyp-provisioning';
 import { AgypQuotaProbe } from '../../../src/infrastructure/agyp/agyp-quota-probe';
 import { AgypService } from '../../../src/infrastructure/agyp/agyp-service';
 import { AgypShadowHome } from '../../../src/infrastructure/agyp/agyp-shadow-home';
@@ -25,6 +26,12 @@ export function snapshotFor(email: string, remaining: number): QuotaSnapshot {
 export class StubProbe extends AgypQuotaProbe {
   public sessions: LiveSession[] = [];
   public snapshots = new Map<string, QuotaSnapshot>();
+  /** What a watched sign-in session reports; null means it never identified. */
+  public watched: QuotaSnapshot | null = null;
+
+  public override async watchSignIn(): Promise<QuotaSnapshot | null> {
+    return this.watched;
+  }
 
   public override async discoverLiveSessions(): Promise<LiveSession[]> {
     return this.sessions;
@@ -55,13 +62,24 @@ export interface Harness {
   shadow: AgypShadowHome;
 }
 
-export function buildHarness(): Harness {
+export function buildHarness(agyBinary?: string): Harness {
   const paths = new AgypPaths(fakeHome, join(testRoot, 'vault'));
   const vault = new AgypVault(paths);
   const keychain = new AgypKeychain(fakeSecurity);
   const shadow = new AgypShadowHome(paths, keychain);
   const probe = new StubProbe();
-  const service = new AgypService({ paths, vault, keychain, shadowHome: shadow, probe });
+  const provisioning =
+    agyBinary === undefined
+      ? undefined
+      : new AgypProvisioning(paths, vault, keychain, shadow, probe, agyBinary);
+  const service = new AgypService({
+    paths,
+    vault,
+    keychain,
+    shadowHome: shadow,
+    probe,
+    provisioning,
+  });
   return { cli: new AgypCli(service), service, vault, paths, probe, keychain, shadow };
 }
 

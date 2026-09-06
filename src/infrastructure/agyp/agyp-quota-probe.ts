@@ -1,14 +1,17 @@
 import { spawn, spawnSync } from 'node:child_process';
 import type { ChildProcess } from 'node:child_process';
 import { parseUserStatus } from '../../domain/agyp/agyp-quota';
-import type { LiveSession, QuotaSnapshot } from '../../domain/agyp/agyp-types';
+import type { LiveSession, QuotaSnapshot, QuotaSource } from '../../domain/agyp/agyp-types';
 
 const USER_STATUS_PATH = '/exa.language_server_pb.LanguageServerService/GetUserStatus';
 const PORT_POLL_INTERVAL_MS = 50;
 const PORT_POLL_ATTEMPTS = 200;
-const STATUS_RETRY_ATTEMPTS = 12;
-const STATUS_RETRY_INTERVAL_MS = 200;
 const STATUS_TIMEOUT_MS = 2500;
+const IDENTITY_POLL_INTERVAL_MS = 200;
+// Keyring load, token validation and the user-info fetch together take a few
+// seconds on a cold start; give the server room to finish authenticating.
+const IDENTITY_POLL_ATTEMPTS = 30;
+const SIGN_IN_WATCH_INTERVAL_MS = 500;
 
 interface ListeningPort {
   pid: number;
@@ -130,6 +133,59 @@ export class AgypQuotaProbe {
     }
   }
 
+  private static portsForPid(pid: number): number[] {
+    return AgypQuotaProbe.listListeningPorts()
+      .filter((entry) => entry.pid === pid)
+      .map((entry) => entry.port);
+  }
+
+  /**
+   * Polls a language server until it reports an authenticated account.
+   *
+   * `GetUserStatus` answers before sign-in has finished, with no email in the
+   * payload. That is "not yet", not "no": treating it as failure is exactly
+   * how a valid sign-in got discarded.
+   */
+  public async awaitIdentity(
+    port: number,
+    source: QuotaSource,
+    attempts: number = IDENTITY_POLL_ATTEMPTS
+  ): Promise<QuotaSnapshot | null> {
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
+      const payload = await this.fetchUserStatus(port);
+      const snapshot = payload === null ? null : parseUserStatus(payload, source);
+      if (snapshot) {
+        return snapshot;
+      }
+      await delay(IDENTITY_POLL_INTERVAL_MS);
+    }
+    return null;
+  }
+
+  /**
+   * Follows an `agy` the user is signing into and returns the account it was
+   * authenticated as when it exited.
+   *
+   * Reading identity from the session itself removes the need to start a
+   * second process afterwards and race its start-up. The last reading wins
+   * so a sign-out and sign-in inside the same session is honoured.
+   */
+  public async watchSignIn(pid: number, hasExited: () => boolean): Promise<QuotaSnapshot | null> {
+    let latest: QuotaSnapshot | null = null;
+    while (!hasExited()) {
+      const [port] = AgypQuotaProbe.portsForPid(pid);
+      if (port !== undefined) {
+        const payload = await this.fetchUserStatus(port);
+        const snapshot = payload === null ? null : parseUserStatus(payload, 'live_session');
+        if (snapshot) {
+          latest = snapshot;
+        }
+      }
+      await delay(SIGN_IN_WATCH_INTERVAL_MS);
+    }
+    return latest;
+  }
+
   /**
    * Starts a throwaway `agy` under the account's shadow home purely to read its
    * quota, then stops it. `models` is used because it boots the language server
@@ -153,14 +209,7 @@ export class AgypQuotaProbe {
       if (!discovered) {
         return null;
       }
-      for (let attempt = 0; attempt < STATUS_RETRY_ATTEMPTS; attempt += 1) {
-        const payload = await this.fetchUserStatus(discovered.port);
-        if (payload !== null) {
-          return parseUserStatus(payload, 'spawned_probe');
-        }
-        await delay(STATUS_RETRY_INTERVAL_MS);
-      }
-      return null;
+      return await this.awaitIdentity(discovered.port, 'spawned_probe');
     } finally {
       AgypQuotaProbe.terminate(child, child.pid ?? null);
     }

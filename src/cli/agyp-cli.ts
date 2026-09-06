@@ -91,7 +91,9 @@ export class AgypCli {
       case 'current':
         return this.handlers.current();
       case 'login':
-        return this.handlers.login();
+        return this.handlers.login(argument);
+      case 'claim':
+        return this.handlers.claim(argument ?? '');
       case 'import':
         return this.handlers.importCurrent();
       case 'logout':
