@@ -83,4 +83,12 @@ function agy() {
   HOME="$AGYP_HOME" command agy "$@"
 }
 
+# A shell that inherits AGYP_HOME (a tmux restore, an agent's cached env) may
+# launch agy without the wrapper. Open the account keychain now, so one locked
+# since the last restart cannot surface later as a password prompt. Supplying
+# the password means this can never prompt itself.
+if [[ -n "${AGYP_HOME:-}" && -f "$AGYP_HOME/Library/Keychains/agyp.keychain-db" ]]; then
+  /usr/bin/security unlock-keychain -p '' "$AGYP_HOME/Library/Keychains/agyp.keychain-db" 2>/dev/null || true
+fi
+
 return 0
