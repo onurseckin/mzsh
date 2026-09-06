@@ -38,13 +38,14 @@ export class AgypBackups {
       mode: 0o700,
     });
     const created = this.keychain.createKeychain(path, this.paths.backupHome);
+    // Open before touching settings: on a locked keychain that call prompts.
+    this.keychain.unlockKeychain(path);
     this.keychain.disableAutoLock(path);
     try {
       chmodSync(path, 0o600);
     } catch {
       // Reported through `created`.
     }
-    this.keychain.unlockKeychain(path);
     return created;
   }
 

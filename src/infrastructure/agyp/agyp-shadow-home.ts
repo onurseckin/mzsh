@@ -112,21 +112,24 @@ export class AgypShadowHome {
     mkdirSync(dirname(keychainPath), { recursive: true, mode: 0o700 });
 
     const keychainCreated = keychain.createKeychain(keychainPath, home);
-    // Applied on every call, not just creation: keychains made before this was
-    // in place still carry the auto-locking default.
-    keychain.disableAutoLock(keychainPath);
-    // A sandbox keychain we cannot open is worse than no keychain: every read
-    // through it escalates to a GUI password prompt the user cannot answer,
-    // because the password was empty and something re-keyed it. Replace it and
-    // let the caller restore the credential from its mirror.
+
+    // Open it before anything else touches it. Changing a locked keychain's
+    // settings makes macOS ask for its password, which is the one thing this
+    // code exists to never do; a keychain locked since the last restart is the
+    // normal case, not the exception.
     let keychainRebuilt = false;
     if (!keychain.unlockKeychain(keychainPath)) {
+      // It will not open with the password it was created with: something
+      // re-keyed it. Left in place, every read would raise a prompt the user
+      // cannot answer. Replace it and let the caller restore the credential.
       rmSync(keychainPath, { force: true });
       keychain.createKeychain(keychainPath, home);
-      keychain.disableAutoLock(keychainPath);
       keychain.unlockKeychain(keychainPath);
       keychainRebuilt = true;
     }
+    // Applied on every call, not just creation: keychains made before this was
+    // in place still carry the auto-locking default.
+    keychain.disableAutoLock(keychainPath);
 
     // security creates keychains world-readable and this file holds a refresh
     // token. Narrowed after the rebuild branch, so it covers whichever file

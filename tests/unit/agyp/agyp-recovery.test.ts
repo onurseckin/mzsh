@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { mkdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   buildHarness,
@@ -90,6 +90,34 @@ describe('sign-in backup copies', () => {
     const parsed = JSON.parse(result.out) as { repairs: { action: string }[] };
     expect(parsed.repairs.map((step) => step.action)).toEqual(['added a copy to the agyp store']);
     expect(harness.backups.status('older@example.com')).toEqual({ store: true, login: true });
+  });
+
+  test('saving to a store locked since restart never prompts', async () => {
+    const harness = await adopted();
+    writeFileSync(`${harness.paths.backupKeychain}.locked`, '');
+
+    const saved = harness.backups.save('person@example.com', 'renewed');
+    expect(saved.store).toBeTrue();
+    expect(existsSync(`${harness.paths.backupKeychain}.prompted`)).toBeFalse();
+  });
+
+  test('use after a restart, every keychain locked, never prompts', async () => {
+    const harness = await adopted();
+    for (const path of [
+      harness.paths.shadowKeychain('person@example.com'),
+      harness.paths.backupKeychain,
+    ]) {
+      writeFileSync(`${path}.locked`, '');
+    }
+
+    const result = await invoke(harness.cli, ['use', 'person']);
+    expect(result.code).toBe(0);
+    for (const path of [
+      harness.paths.shadowKeychain('person@example.com'),
+      harness.paths.backupKeychain,
+    ]) {
+      expect(existsSync(`${path}.prompted`), path).toBeFalse();
+    }
   });
 
   test('doctor --repair on a whole vault changes nothing and says so', async () => {

@@ -35,6 +35,9 @@ case "$command" in
     : > "$1.locked"
     ;;
   set-keychain-settings)
+    # Settings cannot change on a locked keychain; the real tool raises a
+    # password dialog here. Record that a prompt would have appeared.
+    [[ -f "$1.locked" ]] && { : > "$1.prompted"; exit 51; }
     : > "$1.nolock"
     ;;
   default-keychain)
@@ -70,7 +73,7 @@ case "$command" in
       esac
     done
     [[ -n "$keychain" ]] || exit 1
-    [[ -f "$keychain.locked" ]] && exit 51
+    [[ -f "$keychain.locked" ]] && { : > "$keychain.prompted"; exit 51; }
     printf '%s' "$blob" > "$(item_file "$keychain" "$service" "$account")"
     ;;
   find-generic-password)
@@ -93,7 +96,7 @@ case "$command" in
       done < "$search_list"
       exit 44
     fi
-    [[ -f "$keychain.locked" ]] && exit 51
+    [[ -f "$keychain.locked" ]] && { : > "$keychain.prompted"; exit 51; }
     [[ -s "$(item_file "$keychain" "$service" "$account")" ]] || exit 44
     cat "$(item_file "$keychain" "$service" "$account")"
     ;;

@@ -284,6 +284,21 @@ describe('agyp credential storage', () => {
     expect(statSync(keychainPath).mode & 0o777).toBe(0o600);
   });
 
+  test('wires a sandbox whose keychain is locked without ever prompting', () => {
+    // A keychain is locked after every restart. The first `agyp use` after a
+    // reboot used to change its settings before opening it, which made macOS
+    // ask for a password. The fixture records any operation that would prompt.
+    const { paths, shadow } = build();
+    shadow.ensure('person@example.com', true);
+    const keychainPath = paths.shadowKeychain('person@example.com');
+    writeFileSync(`${keychainPath}.locked`, '');
+
+    const report = shadow.ensure('person@example.com', true);
+    expect(report.keychainRebuilt).toBeFalse();
+    expect(existsSync(`${keychainPath}.prompted`)).toBeFalse();
+    expect(existsSync(`${keychainPath}.locked`)).toBeFalse();
+  });
+
   test('leaves a healthy sandbox keychain alone', () => {
     const { shadow } = build();
     shadow.ensure('person@example.com', true);
