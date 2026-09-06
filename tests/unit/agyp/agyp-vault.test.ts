@@ -16,15 +16,7 @@ function snapshot(email: string, remaining: number): QuotaSnapshot {
   return {
     email,
     planName: 'Pro',
-    pools: [
-      {
-        id: 'gemini',
-        label: 'Gemini',
-        remainingPercentage: remaining,
-        resetTime: null,
-        modelCount: 1,
-      },
-    ],
+    gemini: { remainingPercentage: remaining, resetTime: null, modelCount: 1 },
     capturedAt: new Date().toISOString(),
     source: 'live_session',
   };
@@ -127,7 +119,7 @@ describe('AgypVault', () => {
     vault.rememberQuota(snapshot('person@example.com', 42));
 
     const recalled = vault.recallQuota('person@example.com');
-    expect(recalled?.pools[0]?.remainingPercentage).toBe(42);
+    expect(recalled?.gemini?.remainingPercentage).toBe(42);
     expect(recalled?.source).toBe('cache');
   });
 

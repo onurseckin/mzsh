@@ -18,15 +18,7 @@ function snapshotFor(email: string, remaining: number): QuotaSnapshot {
   return {
     email,
     planName: 'Pro',
-    pools: [
-      {
-        id: 'gemini',
-        label: 'Gemini',
-        remainingPercentage: remaining,
-        resetTime: null,
-        modelCount: 11,
-      },
-    ],
+    gemini: { remainingPercentage: remaining, resetTime: null, modelCount: 11 },
     capturedAt: '2026-09-06T15:00:00Z',
     source: 'live_session',
   };
@@ -206,7 +198,7 @@ describe('AgypCli', () => {
     const result = await invoke(cli, ['list']);
     expect(result.out).toContain('S  second@example.com');
     expect(result.out).toContain(' G first@example.com');
-    expect(result.out).toContain('Gemini 80.5%');
+    expect(result.out).toContain('80.5%');
     expect(result.out).toContain('1 running');
   });
 
@@ -217,7 +209,7 @@ describe('AgypCli', () => {
 
     const result = await invoke(cli, ['quota', 'person']);
     expect(result.code).toBe(0);
-    expect(result.out).toContain('Gemini 0%');
+    expect(result.out).toContain('0%');
   });
 
   test('doctor summarises the vault and running sessions', async () => {

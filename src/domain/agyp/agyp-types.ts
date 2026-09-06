@@ -33,14 +33,10 @@ export interface LegacyAccountRegistry {
 }
 
 /**
- * Antigravity meters two independent pools. Every Gemini model shares one
- * allowance and one reset instant; Claude and GPT-OSS share another.
+ * An account's Gemini allowance: the one figure that decides whether the
+ * account can still do work.
  */
-export type QuotaPoolId = 'gemini' | 'premium';
-
-export interface QuotaPool {
-  id: QuotaPoolId;
-  label: string;
+export interface QuotaReading {
   /** 0-100. Absent `remainingFraction` in the payload means exactly zero. */
   remainingPercentage: number;
   resetTime: string | null;
@@ -52,7 +48,7 @@ export type QuotaSource = 'live_session' | 'spawned_probe' | 'cache';
 export interface QuotaSnapshot {
   email: string;
   planName: string | null;
-  pools: QuotaPool[];
+  gemini: QuotaReading | null;
   capturedAt: string;
   source: QuotaSource;
 }

@@ -23,30 +23,24 @@ export function quotaColour(remainingPercentage: number): string {
   return remainingPercentage >= 15 ? YELLOW : RED;
 }
 
-export function formatPoolCell(
-  label: string,
-  percentage: number,
-  resetTime: string | null
-): string {
+export function formatQuotaCell(percentage: number, resetTime: string | null): string {
   const colour = quotaColour(percentage);
   const value = percentage === 0 ? 'empty' : `${percentage}%`;
   const hint = formatResetHint(resetTime);
-  const reset = hint.length > 0 ? ` ${DIM}(${hint})${RESET}` : '';
-  return `${DIM}${label}${RESET} ${colour}${value.padEnd(6)}${RESET}${reset}`;
+  const reset = hint.length > 0 ? ` ${DIM}resets in ${hint}${RESET}` : '';
+  return `${colour}${value.padEnd(6)}${RESET}${reset}`;
 }
 
-export function formatQuotaCells(snapshot: QuotaSnapshot | null): string {
+export function formatQuota(snapshot: QuotaSnapshot | null): string {
   if (!snapshot) {
     return `${DIM}quota unavailable${RESET}`;
   }
-  if (snapshot.pools.length === 0) {
+  if (snapshot.gemini === null) {
     return `${DIM}no metered models${RESET}`;
   }
-  const cells = snapshot.pools.map((pool) =>
-    formatPoolCell(pool.label, pool.remainingPercentage, pool.resetTime)
-  );
+  const cell = formatQuotaCell(snapshot.gemini.remainingPercentage, snapshot.gemini.resetTime);
   const stale = snapshot.source === 'cache' ? ` ${DIM}[cached]${RESET}` : '';
-  return `${cells.join('   ')}${stale}`;
+  return `${cell}${stale}`;
 }
 
 /**
@@ -93,13 +87,12 @@ export function formatRow(
   const ordinal = index < 9 ? `${DIM}${index + 1}.${RESET} ` : '    ';
   const badge = formatScopeBadge(row);
 
-  const emailWidth = Math.max(18, Math.min(34, columns - 46));
+  const emailWidth = Math.max(18, Math.min(34, columns - 40));
   const emailText = truncate(row.email, emailWidth).padEnd(emailWidth);
   const email = selected ? `\x1b[1;37m${emailText}${RESET}` : `\x1b[37m${emailText}${RESET}`;
 
   const live = formatLiveBadge(row.liveSessionCount);
-  const quota = formatQuotaCells(row.snapshot);
-  return `${cursor}${ordinal}${badge} ${email}  ${quota}  ${live}`;
+  return `${cursor}${ordinal}${badge} ${email}  ${formatQuota(row.snapshot)}  ${live}`;
 }
 
 export const AGYP_TUI_KEY_HINTS =

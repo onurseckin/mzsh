@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import {
-  formatPoolCell,
-  formatQuotaCells,
+  formatQuota,
+  formatQuotaCell,
   formatRow,
   formatScopeBadge,
   formatScopeHeader,
@@ -24,22 +24,7 @@ function snapshotWith(
   return {
     email: 'person@example.com',
     planName: 'Pro',
-    pools: [
-      {
-        id: 'gemini',
-        label: 'Gemini',
-        remainingPercentage: remaining,
-        resetTime: null,
-        modelCount: 11,
-      },
-      {
-        id: 'premium',
-        label: 'Claude/GPT',
-        remainingPercentage: 100,
-        resetTime: null,
-        modelCount: 3,
-      },
-    ],
+    gemini: { remainingPercentage: remaining, resetTime: null, modelCount: 11 },
     capturedAt: '2026-09-06T15:00:00Z',
     source,
   };
@@ -61,29 +46,35 @@ describe('quota colouring', () => {
   });
 });
 
-describe('quota cells', () => {
-  test('spells out an empty pool rather than showing 0%', () => {
-    expect(stripAnsi(formatPoolCell('Gemini', 0, null))).toContain('empty');
+describe('quota rendering', () => {
+  test('spells out an empty allowance rather than showing 0%', () => {
+    expect(stripAnsi(formatQuotaCell(0, null))).toContain('empty');
   });
 
   test('appends a reset countdown when one is known', () => {
     const future = new Date(Date.now() + 45 * 60 * 1000).toISOString();
-    expect(stripAnsi(formatPoolCell('Gemini', 40, future))).toMatch(/\(\d+m\)/);
+    expect(stripAnsi(formatQuotaCell(40, future))).toMatch(/resets in \d+m/);
   });
 
-  test('renders both pools', () => {
-    const rendered = stripAnsi(formatQuotaCells(snapshotWith(80.5)));
-    expect(rendered).toContain('Gemini');
+  test('shows only the Gemini allowance', () => {
+    const rendered = stripAnsi(formatQuota(snapshotWith(80.5)));
     expect(rendered).toContain('80.5%');
-    expect(rendered).toContain('Claude/GPT');
+    // Claude and GPT are separate products and must not appear in the switcher.
+    expect(rendered).not.toContain('Claude');
+    expect(rendered).not.toContain('GPT');
   });
 
   test('flags a cached reading', () => {
-    expect(stripAnsi(formatQuotaCells(snapshotWith(80.5, 'cache')))).toContain('[cached]');
+    expect(stripAnsi(formatQuota(snapshotWith(80.5, 'cache')))).toContain('[cached]');
   });
 
   test('says so when there is no reading at all', () => {
-    expect(stripAnsi(formatQuotaCells(null))).toContain('quota unavailable');
+    expect(stripAnsi(formatQuota(null))).toContain('quota unavailable');
+  });
+
+  test('says so when nothing is metered', () => {
+    const snapshot = { ...snapshotWith(0), gemini: null };
+    expect(stripAnsi(formatQuota(snapshot))).toContain('no metered models');
   });
 });
 
@@ -106,7 +97,7 @@ describe('rows', () => {
   test('shows the account, quota and running-session count', () => {
     const rendered = stripAnsi(formatRow({ ...baseRow, liveSessionCount: 2 }, 0, true, 120));
     expect(rendered).toContain('person@example.com');
-    expect(rendered).toContain('Gemini');
+    expect(rendered).toContain('80.5%');
     expect(rendered).toContain('2 running');
     expect(rendered).toContain('1.');
   });

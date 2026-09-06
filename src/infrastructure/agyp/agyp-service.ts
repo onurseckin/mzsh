@@ -220,12 +220,13 @@ export class AgypService {
     if (!entry.snapshot) {
       return 'quota unknown';
     }
-    const parts = entry.snapshot.pools.map((pool) => {
-      const hint = formatResetHint(pool.resetTime);
-      const suffix = hint.length > 0 ? ` (${hint})` : '';
-      return `${pool.label} ${pool.remainingPercentage}%${suffix}`;
-    });
+    if (entry.snapshot.gemini === null) {
+      return 'no metered models';
+    }
+    const { remainingPercentage, resetTime } = entry.snapshot.gemini;
+    const hint = formatResetHint(resetTime);
+    const reset = hint.length > 0 ? ` resets in ${hint}` : '';
     const staleness = entry.snapshot.source === 'cache' ? ' [cached]' : '';
-    return `${parts.join('  ')}${staleness}`;
+    return `${remainingPercentage}%${reset}${staleness}`;
   }
 }

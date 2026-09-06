@@ -1,4 +1,5 @@
 import {
+  chmodSync,
   existsSync,
   lstatSync,
   mkdirSync,
@@ -107,6 +108,13 @@ export class AgypShadowHome {
     // Applied on every call, not just creation: keychains made before this was
     // in place still carry the auto-locking default.
     keychain.disableAutoLock(keychainPath);
+    // security creates keychains world-readable. The enclosing directories are
+    // owner-only, but this file holds a refresh token, so narrow it directly.
+    try {
+      chmodSync(keychainPath, 0o600);
+    } catch {
+      // A keychain we could not create is reported through keychainCreated.
+    }
     const searchListApplied = keychain.setSearchList(home, searchList);
     // Reads follow the search list, writes follow the default. agy does both.
     const defaultKeychainApplied = keychain.setDefaultKeychain(home, keychainPath);

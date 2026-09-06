@@ -1,5 +1,13 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { existsSync, lstatSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import { AgypPaths } from '../../src/domain/agyp/agyp-paths';
 import { AgypVault } from '../../src/domain/agyp/agyp-vault';
@@ -204,6 +212,15 @@ describe('agyp credential storage', () => {
 
     keychain.writeCredential(paths.shadowKeychain('person@example.com'), blob);
     expect(keychain.readCredential(paths.shadowKeychain('person@example.com'))).toBe(blob);
+  });
+
+  test('keeps the account keychain readable only by its owner', () => {
+    const { paths, shadow } = build();
+    shadow.ensure('person@example.com', true);
+
+    // The file holds a refresh token; security creates it world-readable.
+    const mode = statSync(paths.shadowKeychain('person@example.com')).mode & 0o777;
+    expect(mode).toBe(0o600);
   });
 
   test('turns off auto-locking when wiring a sandbox', () => {

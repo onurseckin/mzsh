@@ -130,8 +130,9 @@ export class AgypCli {
         entry.email === scope.sessionAccount ? 'S' : ' ',
         entry.email === scope.globalAccount ? 'G' : ' ',
       ].join('');
-      const live = entry.liveSessions.length > 0 ? ` ${entry.liveSessions.length} running` : '';
-      return `${badges} ${entry.email.padEnd(32)} ${AgypService.describeQuota(entry)}${live}`;
+      const live = entry.liveSessions.length > 0 ? `${entry.liveSessions.length} running` : '';
+      const quota = AgypService.describeQuota(entry).padEnd(24);
+      return `${badges} ${entry.email.padEnd(32)} ${quota} ${live}`.trimEnd();
     });
     return { success: true, action: 'print', payload: lines.join('\n') };
   }

@@ -1,9 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import {
-  classifyPool,
-  findPool,
   formatResetHint,
-  lowestRemainingPercentage,
+  isGeminiModel,
   parseUserStatus,
   readRemainingFraction,
 } from '../../../src/domain/agyp/agyp-quota';
@@ -33,19 +31,21 @@ describe('quota fraction reading', () => {
   });
 });
 
-describe('pool classification', () => {
-  test('routes Claude and GPT models to the premium pool', () => {
-    expect(classifyPool('Claude Opus 4.6 (Thinking)')).toBe('premium');
-    expect(classifyPool('GPT-OSS 120B (Medium)')).toBe('premium');
+describe('model selection', () => {
+  test('excludes Claude and GPT models', () => {
+    // They are separate products whose reported figures do not track usage,
+    // so they must not influence whether an account looks usable.
+    expect(isGeminiModel('Claude Opus 4.6 (Thinking)')).toBeFalse();
+    expect(isGeminiModel('GPT-OSS 120B (Medium)')).toBeFalse();
   });
 
-  test('routes everything else to the Gemini pool', () => {
-    expect(classifyPool('Gemini 3.8 Flash (High)')).toBe('gemini');
+  test('keeps Gemini models', () => {
+    expect(isGeminiModel('Gemini 3.8 Flash (High)')).toBeTrue();
   });
 });
 
 describe('parseUserStatus', () => {
-  test('separates the two metered pools', () => {
+  test('measures only the Gemini allowance', () => {
     const snapshot = parseUserStatus(
       userStatus([
         {
@@ -61,15 +61,13 @@ describe('parseUserStatus', () => {
       'live_session'
     );
 
-    expect(snapshot).not.toBeNull();
-    expect(snapshot?.pools).toHaveLength(2);
-    expect(findPool(snapshot!, 'gemini')?.remainingPercentage).toBe(80.5);
-    expect(findPool(snapshot!, 'gemini')?.modelCount).toBe(2);
-    expect(findPool(snapshot!, 'premium')?.remainingPercentage).toBe(100);
-    expect(findPool(snapshot!, 'premium')?.resetTime).toBe('r2');
+    expect(snapshot?.gemini?.remainingPercentage).toBe(80.5);
+    expect(snapshot?.gemini?.modelCount).toBe(2);
+    expect(snapshot?.gemini?.resetTime).toBe('r1');
   });
 
-  test('reports an exhausted pool as zero rather than unknown', () => {
+  test('reports an exhausted allowance as zero rather than unknown', () => {
+    // A full Claude pool must not mask a spent Gemini one.
     const snapshot = parseUserStatus(
       userStatus([
         { label: 'Gemini 3.8 Flash (High)', quotaInfo: { resetTime: '2026-09-06T17:04:59Z' } },
@@ -78,12 +76,11 @@ describe('parseUserStatus', () => {
       'live_session'
     );
 
-    expect(findPool(snapshot!, 'gemini')?.remainingPercentage).toBe(0);
-    expect(findPool(snapshot!, 'gemini')?.resetTime).toBe('2026-09-06T17:04:59Z');
-    expect(findPool(snapshot!, 'premium')?.remainingPercentage).toBe(100);
+    expect(snapshot?.gemini?.remainingPercentage).toBe(0);
+    expect(snapshot?.gemini?.resetTime).toBe('2026-09-06T17:04:59Z');
   });
 
-  test('takes the lowest reading when a pool disagrees with itself', () => {
+  test('takes the lowest reading when models disagree', () => {
     const snapshot = parseUserStatus(
       userStatus([
         { label: 'Gemini 3.8 Flash (High)', quotaInfo: { remainingFraction: 0.9 } },
@@ -92,7 +89,15 @@ describe('parseUserStatus', () => {
       'cache'
     );
 
-    expect(findPool(snapshot!, 'gemini')?.remainingPercentage).toBe(40);
+    expect(snapshot?.gemini?.remainingPercentage).toBe(40);
+  });
+
+  test('reports no reading when nothing is metered', () => {
+    const snapshot = parseUserStatus(
+      userStatus([{ label: 'Claude Opus 4.6 (Thinking)', quotaInfo: { remainingFraction: 1 } }]),
+      'live_session'
+    );
+    expect(snapshot?.gemini).toBeNull();
   });
 
   test('carries the account identity and plan', () => {
@@ -109,17 +114,6 @@ describe('parseUserStatus', () => {
 });
 
 describe('summaries', () => {
-  test('lowestRemainingPercentage spans every pool', () => {
-    const snapshot = parseUserStatus(
-      userStatus([
-        { label: 'Gemini 3.8 Flash (High)', quotaInfo: {} },
-        { label: 'Claude Opus 4.6 (Thinking)', quotaInfo: { remainingFraction: 1 } },
-      ]),
-      'live_session'
-    );
-    expect(lowestRemainingPercentage(snapshot!)).toBe(0);
-  });
-
   test('formatResetHint renders a countdown', () => {
     const now = new Date('2026-09-06T15:12:00Z');
     expect(formatResetHint('2026-09-06T17:04:00Z', now)).toBe('1h 52m');
