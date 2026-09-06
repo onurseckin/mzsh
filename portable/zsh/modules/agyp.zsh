@@ -43,7 +43,7 @@ function agyp() {
   local line
   while IFS= read -r line; do
     case "$line" in
-      export\ AGYP_*|unset\ AGYP_*|unset\ JETSKI_*)
+      export\ AGYP_*|unset\ AGYP_*)
         eval "$line"
         ;;
       '')

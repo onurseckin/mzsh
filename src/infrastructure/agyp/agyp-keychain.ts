@@ -33,10 +33,6 @@ export class AgypKeychain {
     this.securityBinary = securityBinary;
   }
 
-  public isSupported(): boolean {
-    return process.platform === 'darwin' && existsSync(this.securityBinary);
-  }
-
   private run(args: readonly string[], home?: string): SecurityRun {
     const environment = home === undefined ? process.env : { ...process.env, HOME: home };
     const result = spawnSync(this.securityBinary, [...args], {
@@ -189,15 +185,6 @@ export class AgypKeychain {
       blob,
       keychainPath,
     ];
-    return this.run(args).exitCode === 0;
-  }
-
-  public deleteCredential(keychainPath: string): boolean {
-    this.unlockKeychain(keychainPath);
-    const args = ['delete-generic-password', '-s', KEYCHAIN_SERVICE, '-a', KEYCHAIN_ACCOUNT];
-    if (existsSync(keychainPath)) {
-      args.push(keychainPath);
-    }
     return this.run(args).exitCode === 0;
   }
 

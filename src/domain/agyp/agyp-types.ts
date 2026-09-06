@@ -25,13 +25,6 @@ export interface AccountRegistry {
   accounts: AccountMetadata[];
 }
 
-/** Registry as written by the pre-shadow-home implementation. */
-export interface LegacyAccountRegistry {
-  version: 1;
-  activeAccount: string | null;
-  accounts: AccountMetadata[];
-}
-
 /**
  * An account's Gemini allowance: the one figure that decides whether the
  * account can still do work.

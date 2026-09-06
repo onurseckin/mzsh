@@ -82,7 +82,6 @@ export class AgypService {
       exportScript: [
         `export ${SESSION_ACCOUNT_VARIABLE}="${canonical}"`,
         `export AGYP_HOME="${shadowHome}"`,
-        'unset JETSKI_STANDALONE_OAUTH_TOKEN_PATH',
       ].join('\n'),
     };
   }

@@ -45,7 +45,6 @@ describe('AgypVault', () => {
 
     expect(created.email).toBe('person@example.com');
     expect(vault.getGlobalAccount()).toBe('person@example.com');
-    expect(vault.hasAccount('PERSON@example.com')).toBeTrue();
   });
 
   test('keeps the first account as global when a second is added', () => {
@@ -80,29 +79,6 @@ describe('AgypVault', () => {
     vault.removeAccount('only@example.com');
 
     expect(vault.getGlobalAccount()).toBeNull();
-  });
-
-  test('reads a version 1 registry as a version 2 one', () => {
-    const { vault, paths } = makeVault();
-    writeFileSync(
-      paths.registryPath,
-      JSON.stringify({
-        version: 1,
-        activeAccount: 'legacy@example.com',
-        accounts: [
-          {
-            email: 'legacy@example.com',
-            addedAt: '2026-01-01T00:00:00Z',
-            lastUsedAt: '2026-01-01T00:00:00Z',
-          },
-        ],
-      })
-    );
-
-    const registry = vault.readRegistry();
-    expect(registry.version).toBe(2);
-    expect(registry.globalAccount).toBe('legacy@example.com');
-    expect(registry.accounts).toHaveLength(1);
   });
 
   test('preserves an unreadable registry instead of discarding it', () => {

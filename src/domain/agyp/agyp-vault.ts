@@ -9,13 +9,7 @@ import {
 } from 'node:fs';
 import type { AgypPaths } from './agyp-paths';
 import { matchAccount } from './agyp-matcher';
-import type {
-  AccountMetadata,
-  AccountRegistry,
-  LegacyAccountRegistry,
-  QuotaCache,
-  QuotaSnapshot,
-} from './agyp-types';
+import type { AccountMetadata, AccountRegistry, QuotaCache, QuotaSnapshot } from './agyp-types';
 
 function emptyRegistry(): AccountRegistry {
   return { version: 2, globalAccount: null, accounts: [] };
@@ -88,15 +82,6 @@ export class AgypVault {
       return emptyRegistry();
     }
 
-    if (record.version === 1) {
-      const legacy = record as unknown as LegacyAccountRegistry;
-      return {
-        version: 2,
-        globalAccount: legacy.activeAccount,
-        accounts: legacy.accounts,
-      };
-    }
-
     return {
       version: 2,
       globalAccount: typeof record.globalAccount === 'string' ? record.globalAccount : null,
@@ -110,11 +95,6 @@ export class AgypVault {
 
   public listAccounts(): AccountMetadata[] {
     return this.readRegistry().accounts;
-  }
-
-  public hasAccount(email: string): boolean {
-    const canonical = this.canonicalizeEmail(email);
-    return this.readRegistry().accounts.some((account) => account.email === canonical);
   }
 
   public registerAccount(email: string): AccountMetadata {

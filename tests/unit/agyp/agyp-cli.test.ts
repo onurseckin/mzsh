@@ -134,7 +134,6 @@ describe('AgypCli', () => {
     expect(result.code).toBe(0);
     expect(result.out).toContain('export AGYP_ACCOUNT="person@example.com"');
     expect(result.out).toContain('export AGYP_HOME=');
-    expect(result.out).toContain('unset JETSKI_STANDALONE_OAUTH_TOKEN_PATH');
   });
 
   test('a bare account query is treated as use', async () => {
