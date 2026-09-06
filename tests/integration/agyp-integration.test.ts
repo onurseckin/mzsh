@@ -271,6 +271,19 @@ describe('agyp credential storage', () => {
     expect(existsSync(keychainPath)).toBeTrue();
   });
 
+  test('a rebuilt sandbox keychain is owner-only too', () => {
+    const { paths, shadow } = build();
+    shadow.ensure('person@example.com', true);
+    const keychainPath = paths.shadowKeychain('person@example.com');
+    writeFileSync(`${keychainPath}.rekeyed`, '');
+
+    // The replacement is created by security at 644; the narrowing must apply
+    // to the file that exists after the rebuild, not the one it replaced.
+    const report = shadow.ensure('person@example.com', true);
+    expect(report.keychainRebuilt).toBeTrue();
+    expect(statSync(keychainPath).mode & 0o777).toBe(0o600);
+  });
+
   test('leaves a healthy sandbox keychain alone', () => {
     const { shadow } = build();
     shadow.ensure('person@example.com', true);
