@@ -238,6 +238,11 @@ export class AgypHandlers {
       if (entry.credentialExpiry !== null) {
         lines.push(`    refreshed until ${entry.credentialExpiry}`);
       }
+      lines.push(
+        entry.hasMirror
+          ? '    backup    in login keychain'
+          : '    backup    NONE — this sign-in cannot be recovered if its keychain is re-keyed'
+      );
       if (!entry.sandboxReady) {
         lines.push('    sandbox missing — it is rebuilt on the next `agyp use`');
       }

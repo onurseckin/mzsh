@@ -25,6 +25,8 @@ export interface AccountHealth {
   keychainPath: string;
   hasCredential: boolean;
   credentialExpiry: string | null;
+  /** Whether a recoverable copy exists in the login keychain. */
+  hasMirror: boolean;
   sandboxReady: boolean;
   strayEntries: string[];
 }
@@ -53,7 +55,8 @@ export class AgypService {
     this.keychain = dependencies.keychain ?? new AgypKeychain();
     this.shadowHome = dependencies.shadowHome ?? new AgypShadowHome(this.paths, this.keychain);
     const probe = dependencies.probe ?? new AgypQuotaProbe();
-    this.quota = dependencies.quota ?? new AgypQuotaService(this.paths, this.vault, probe);
+    this.quota =
+      dependencies.quota ?? new AgypQuotaService(this.paths, this.vault, probe, this.keychain);
     this.provisioning =
       dependencies.provisioning ??
       new AgypProvisioning(this.paths, this.vault, this.keychain, this.shadowHome, probe);
@@ -100,6 +103,18 @@ export class AgypService {
     return { email: found.account.email };
   }
 
+  /**
+   * Puts an account's credential back into a freshly rebuilt sandbox keychain.
+   * Returns false when no mirror exists, which means the sign-in is gone.
+   */
+  private restoreFromMirror(email: string): boolean {
+    const blob = this.keychain.readMirror(this.paths.realKeychain, email);
+    if (blob === null) {
+      return false;
+    }
+    return this.keychain.writeCredential(this.paths.shadowKeychain(email), blob);
+  }
+
   /** Binds an account to the calling shell by emitting shell assignments. */
   public useAccount(query: string): AgypResult {
     const resolved = this.resolveQuery(query);
@@ -108,8 +123,11 @@ export class AgypService {
     }
     const email = resolved.email;
 
-    this.shadowHome.ensure(email, this.layered);
+    const report = this.shadowHome.ensure(email, this.layered);
     const keychainPath = this.paths.shadowKeychain(email);
+    if (report.keychainRebuilt) {
+      this.restoreFromMirror(email);
+    }
     if (!this.keychain.hasCredential(keychainPath)) {
       return {
         success: false,
@@ -117,6 +135,11 @@ export class AgypService {
       };
     }
     this.keychain.unlockKeychain(keychainPath);
+    // Backfills the mirror for accounts adopted before mirroring existed.
+    const blob = this.keychain.readCredential(keychainPath);
+    if (blob !== null && this.keychain.readMirror(this.paths.realKeychain, email) === null) {
+      this.keychain.writeMirror(this.paths.realKeychain, email, blob);
+    }
     this.vault.touchAccount(email);
 
     return {
@@ -183,6 +206,7 @@ export class AgypService {
 
     this.vault.removeAccount(email);
     this.shadowHome.remove(email);
+    this.keychain.deleteMirror(this.paths.realKeychain, email);
 
     const replacement = this.vault.getGlobalAccount();
     if (wasGlobal && replacement !== null) {
@@ -209,6 +233,7 @@ export class AgypService {
         keychainPath,
         hasCredential: blob !== null,
         credentialExpiry: blob === null ? null : AgypKeychain.readCredentialExpiry(blob),
+        hasMirror: this.keychain.readMirror(this.paths.realKeychain, account.email) !== null,
         sandboxReady: this.shadowHome.exists(account.email),
         strayEntries: this.shadowHome.strayEntries(account.email),
       };

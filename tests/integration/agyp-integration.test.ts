@@ -243,6 +243,41 @@ describe('agyp credential storage', () => {
     expect(keychain.readCredential(keychainPath)).toBe('credential');
   });
 
+  test('keeps a recoverable copy of the credential in the login keychain', () => {
+    const { paths, shadow, keychain } = build();
+    shadow.ensure('person@example.com', true);
+    keychain.createKeychain(paths.realKeychain, fakeRealHome);
+
+    expect(keychain.writeMirror(paths.realKeychain, 'person@example.com', 'blob')).toBeTrue();
+    expect(keychain.readMirror(paths.realKeychain, 'person@example.com')).toBe('blob');
+    // The backup must not collide with the credential agy itself stores.
+    keychain.writeCredential(paths.realKeychain, 'agy-own-credential');
+    expect(keychain.readMirror(paths.realKeychain, 'person@example.com')).toBe('blob');
+    expect(keychain.readCredential(paths.realKeychain)).toBe('agy-own-credential');
+  });
+
+  test('replaces a sandbox keychain that can no longer be opened', () => {
+    const { paths, shadow } = build();
+    shadow.ensure('person@example.com', true);
+    const keychainPath = paths.shadowKeychain('person@example.com');
+
+    // Something re-keyed it, so the empty password no longer opens it. Left
+    // alone, every read through it would raise a password prompt the user
+    // cannot answer.
+    writeFileSync(`${keychainPath}.rekeyed`, '');
+    const report = shadow.ensure('person@example.com', true);
+
+    expect(report.keychainRebuilt).toBeTrue();
+    expect(existsSync(keychainPath)).toBeTrue();
+  });
+
+  test('leaves a healthy sandbox keychain alone', () => {
+    const { shadow } = build();
+    shadow.ensure('person@example.com', true);
+
+    expect(shadow.ensure('person@example.com', true).keychainRebuilt).toBeFalse();
+  });
+
   test('reports a missing credential rather than throwing', () => {
     const { paths, shadow, keychain } = build();
     shadow.ensure('person@example.com', true);

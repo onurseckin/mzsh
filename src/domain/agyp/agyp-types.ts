@@ -9,6 +9,17 @@
 export const KEYCHAIN_SERVICE = 'gemini';
 export const KEYCHAIN_ACCOUNT = 'antigravity';
 
+/**
+ * Service name for agyp's own copy of each credential, kept in the real login
+ * keychain under the account's email.
+ *
+ * A sandbox keychain is the working copy, but it carries an empty password and
+ * anything that re-keys it orphans the sign-in beyond recovery. The login
+ * keychain is unlocked by macOS at login and survives that, so it is the copy
+ * an account can actually be rebuilt from.
+ */
+export const MIRROR_SERVICE = 'agyp';
+
 /** zalando/go-keyring wraps non-trivial secrets with this marker before base64. */
 export const GO_KEYRING_BASE64_PREFIX = 'go-keyring-base64:';
 

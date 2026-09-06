@@ -5,6 +5,7 @@ import {
   GO_KEYRING_BASE64_PREFIX,
   KEYCHAIN_ACCOUNT,
   KEYCHAIN_SERVICE,
+  MIRROR_SERVICE,
 } from '../../domain/agyp/agyp-types';
 
 const SECURITY_BINARY = '/usr/bin/security';
@@ -190,6 +191,51 @@ export class AgypKeychain {
 
   public hasCredential(keychainPath: string): boolean {
     return this.readCredential(keychainPath) !== null;
+  }
+
+  /**
+   * Keeps agyp's own copy of a credential in the login keychain.
+   *
+   * Failure is reported rather than thrown: losing the backup must never stop
+   * an account from being usable right now.
+   */
+  public writeMirror(realKeychain: string, email: string, blob: string): boolean {
+    const args = [
+      'add-generic-password',
+      '-U',
+      '-s',
+      MIRROR_SERVICE,
+      '-a',
+      email,
+      '-w',
+      blob,
+      realKeychain,
+    ];
+    return this.run(args).exitCode === 0;
+  }
+
+  public readMirror(realKeychain: string, email: string): string | null {
+    const result = this.run([
+      'find-generic-password',
+      '-s',
+      MIRROR_SERVICE,
+      '-a',
+      email,
+      '-w',
+      realKeychain,
+    ]);
+    if (result.exitCode !== 0) {
+      return null;
+    }
+    const blob = result.stdout.trim();
+    return blob.length > 0 ? blob : null;
+  }
+
+  public deleteMirror(realKeychain: string, email: string): boolean {
+    return (
+      this.run(['delete-generic-password', '-s', MIRROR_SERVICE, '-a', email, realKeychain])
+        .exitCode === 0
+    );
   }
 
   /** Unwraps go-keyring's base64 envelope; returns the input when unwrapped. */

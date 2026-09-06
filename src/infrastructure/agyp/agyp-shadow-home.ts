@@ -20,6 +20,8 @@ export interface ShadowHomeReport {
   keychainCreated: boolean;
   searchListApplied: boolean;
   defaultKeychainApplied: boolean;
+  /** True when an unopenable keychain had to be replaced with a fresh one. */
+  keychainRebuilt: boolean;
 }
 
 /**
@@ -100,7 +102,12 @@ export class AgypShadowHome {
     home: string,
     keychainPath: string,
     searchList: readonly string[]
-  ): { keychainCreated: boolean; searchListApplied: boolean; defaultKeychainApplied: boolean } {
+  ): {
+    keychainCreated: boolean;
+    searchListApplied: boolean;
+    defaultKeychainApplied: boolean;
+    keychainRebuilt: boolean;
+  } {
     mkdirSync(join(home, 'Library', 'Preferences'), { recursive: true, mode: 0o700 });
     mkdirSync(dirname(keychainPath), { recursive: true, mode: 0o700 });
 
@@ -115,10 +122,23 @@ export class AgypShadowHome {
     } catch {
       // A keychain we could not create is reported through keychainCreated.
     }
+    // A sandbox keychain we cannot open is worse than no keychain: every read
+    // through it escalates to a GUI password prompt the user cannot answer,
+    // because the password was empty and something re-keyed it. Replace it and
+    // let the caller restore the credential from its mirror.
+    let keychainRebuilt = false;
+    if (!keychain.unlockKeychain(keychainPath)) {
+      rmSync(keychainPath, { force: true });
+      keychain.createKeychain(keychainPath, home);
+      keychain.disableAutoLock(keychainPath);
+      keychain.unlockKeychain(keychainPath);
+      keychainRebuilt = true;
+    }
+
     const searchListApplied = keychain.setSearchList(home, searchList);
     // Reads follow the search list, writes follow the default. agy does both.
     const defaultKeychainApplied = keychain.setDefaultKeychain(home, keychainPath);
-    return { keychainCreated, searchListApplied, defaultKeychainApplied };
+    return { keychainCreated, searchListApplied, defaultKeychainApplied, keychainRebuilt };
   }
 
   /**

@@ -1,6 +1,7 @@
 import type { AgypPaths } from '../../domain/agyp/agyp-paths';
 import type { AgypVault } from '../../domain/agyp/agyp-vault';
 import type { LiveSession, QuotaSnapshot } from '../../domain/agyp/agyp-types';
+import type { AgypKeychain } from './agyp-keychain';
 import type { AgypQuotaProbe } from './agyp-quota-probe';
 
 export interface QuotaGatherOptions {
@@ -25,11 +26,13 @@ export class AgypQuotaService {
   private readonly paths: AgypPaths;
   private readonly vault: AgypVault;
   private readonly probe: AgypQuotaProbe;
+  private readonly keychain: AgypKeychain;
 
-  constructor(paths: AgypPaths, vault: AgypVault, probe: AgypQuotaProbe) {
+  constructor(paths: AgypPaths, vault: AgypVault, probe: AgypQuotaProbe, keychain: AgypKeychain) {
     this.paths = paths;
     this.vault = vault;
     this.probe = probe;
+    this.keychain = keychain;
   }
 
   public async discoverLiveSessions(): Promise<LiveSession[]> {
@@ -52,6 +55,10 @@ export class AgypQuotaService {
     }
 
     if (options.allowSpawn) {
+      // The spawned agy reads the sandbox keychain itself. A keychain locked
+      // since the last reboot would make it raise a password prompt at the
+      // user, so open it first with the password we hold.
+      this.keychain.unlockKeychain(this.paths.shadowKeychain(email));
       const snapshot = await this.probe.probeShadowHome(this.paths.shadowHome(email));
       if (snapshot) {
         this.vault.rememberQuota(snapshot);

@@ -37,11 +37,14 @@ coverage/
 # Temporary folders
 tmp/
 temp/
+.tmp/
+.scratch/
 .fixtures/
 tests/**/.fixtures/
 
 # OLT runtime capsules
 .olt/capsules/
+.olt/quarantine/
 
 # Agent runtime state
 .superpowers/

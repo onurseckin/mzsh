@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { mkdirSync, rmSync } from 'node:fs';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   buildHarness,
@@ -147,6 +147,60 @@ describe('AgypCli non-interactive surface', () => {
 
     expect(result.code).toBe(0);
     expect(result.out).toContain('--min');
+  });
+
+  test('a re-keyed sandbox keychain is rebuilt and the sign-in restored', async () => {
+    const { cli, vault, paths, keychain, shadow } = buildHarness();
+    vault.registerAccount('person@example.com');
+    shadow.ensure('person@example.com', true);
+    keychain.createKeychain(paths.realKeychain, fakeHome);
+    keychain.writeCredential(paths.shadowKeychain('person@example.com'), 'credential');
+    keychain.writeMirror(paths.realKeychain, 'person@example.com', 'credential');
+
+    // Reproduces the reboot failure: the sandbox keychain no longer opens with
+    // the empty password it was created with.
+    writeFileSync(`${paths.shadowKeychain('person@example.com')}.rekeyed`, '');
+
+    const result = await invoke(cli, ['use', 'person', '--json']);
+    expect(result.code).toBe(0);
+    expect(keychain.readCredential(paths.shadowKeychain('person@example.com'))).toBe('credential');
+  });
+
+  test('an account with no backup says it needs signing in again', async () => {
+    const { cli, vault, paths, keychain, shadow } = buildHarness();
+    vault.registerAccount('person@example.com');
+    shadow.ensure('person@example.com', true);
+    keychain.writeCredential(paths.shadowKeychain('person@example.com'), 'credential');
+    writeFileSync(`${paths.shadowKeychain('person@example.com')}.rekeyed`, '');
+
+    const result = await invoke(cli, ['use', 'person']);
+    expect(result.code).toBe(1);
+    expect(result.err).toContain('agyp login');
+  });
+
+  test('use backfills a missing backup for an older account', async () => {
+    const { cli, vault, paths, keychain, shadow } = buildHarness();
+    vault.registerAccount('person@example.com');
+    shadow.ensure('person@example.com', true);
+    keychain.createKeychain(paths.realKeychain, fakeHome);
+    keychain.writeCredential(paths.shadowKeychain('person@example.com'), 'credential');
+
+    expect(keychain.readMirror(paths.realKeychain, 'person@example.com')).toBeNull();
+    await invoke(cli, ['use', 'person']);
+    expect(keychain.readMirror(paths.realKeychain, 'person@example.com')).toBe('credential');
+  });
+
+  test('doctor reports whether a sign-in is recoverable', async () => {
+    const { cli, vault, paths, keychain, shadow } = buildHarness();
+    vault.registerAccount('person@example.com');
+    shadow.ensure('person@example.com', true);
+    keychain.writeCredential(paths.shadowKeychain('person@example.com'), 'credential');
+
+    const result = await invoke(cli, ['doctor', '--json']);
+    const parsed = JSON.parse(result.out) as {
+      accounts: { hasRecoverableBackup: boolean }[];
+    };
+    expect(parsed.accounts[0]?.hasRecoverableBackup).toBeFalse();
   });
 
   test('doctor --json reports stored sign-ins structurally', async () => {

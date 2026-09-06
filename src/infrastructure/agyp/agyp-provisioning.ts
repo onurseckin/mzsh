@@ -97,6 +97,9 @@ export class AgypProvisioning {
     this.shadowHome.ensure(email, layered);
     const written = this.keychain.writeCredential(this.paths.shadowKeychain(email), blob);
     if (written) {
+      // Best effort: the account works without a mirror, it just could not be
+      // rebuilt if its sandbox keychain is ever re-keyed out from under us.
+      this.keychain.writeMirror(this.paths.realKeychain, email, blob);
       this.vault.registerAccount(email);
     }
     return written;

@@ -89,7 +89,7 @@ export class AgypVault {
     };
   }
 
-  public writeRegistry(registry: AccountRegistry): void {
+  private writeRegistry(registry: AccountRegistry): void {
     this.writeJson(this.paths.registryPath, registry);
   }
 
@@ -158,7 +158,7 @@ export class AgypVault {
     return matchAccount(this.listAccounts(), query);
   }
 
-  public readQuotaCache(): QuotaCache {
+  private readQuotaCache(): QuotaCache {
     const parsed = this.readJson(this.paths.quotaCachePath);
     const record =
       typeof parsed === 'object' && parsed !== null ? (parsed as Record<string, unknown>) : null;
@@ -180,7 +180,7 @@ export class AgypVault {
     return cached ? { ...cached, source: 'cache' } : null;
   }
 
-  public clearQuota(email: string): void {
+  private clearQuota(email: string): void {
     const cache = this.readQuotaCache();
     if (delete cache.snapshots[this.canonicalizeEmail(email)]) {
       this.writeJson(this.paths.quotaCachePath, cache);

@@ -56,6 +56,7 @@ export function serializeHealth(entry: AccountHealth): Record<string, unknown> {
   return {
     account: entry.email,
     hasStoredSignIn: entry.hasCredential,
+    hasRecoverableBackup: entry.hasMirror,
     keychain: entry.keychainPath,
     credentialExpiry: entry.credentialExpiry,
     sandboxReady: entry.sandboxReady,
