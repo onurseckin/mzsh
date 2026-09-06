@@ -58,6 +58,20 @@ export class AgypPaths {
     return join(this.shadowKeychainDir(email), 'agyp.keychain-db');
   }
 
+  /**
+   * agyp's own copy of every sign-in. Lives under the vault, never in a
+   * search list, so it is beyond the reach of anything that resets the
+   * host's keychains.
+   */
+  public get backupKeychain(): string {
+    return join(this.vaultRoot, 'backup.keychain-db');
+  }
+
+  /** Scratch HOME that absorbs create-keychain's search-list side effect. */
+  public get backupHome(): string {
+    return join(this.vaultRoot, 'backup-home');
+  }
+
   public get realKeychain(): string {
     return join(this.realHome, 'Library', 'Keychains', 'login.keychain-db');
   }

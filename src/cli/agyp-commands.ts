@@ -173,9 +173,17 @@ export const AGYP_COMMANDS: readonly AgypCommandSpec[] = [
   {
     name: 'doctor',
     aliases: [],
-    summary: 'Report vault health, stored sign-ins and running agy instances.',
-    options: [JSON_OPTION, HELP_OPTION],
-    examples: ['agyp doctor', 'agyp doctor --json'],
+    summary: 'Report vault health, stored sign-ins, their backup copies and running agy instances.',
+    options: [
+      {
+        flag: '--repair',
+        summary:
+          'Restore any missing or unopenable sign-in from its backup copies and complete the copies.',
+      },
+      JSON_OPTION,
+      HELP_OPTION,
+    ],
+    examples: ['agyp doctor', 'agyp doctor --repair', 'agyp doctor --json'],
   },
   {
     name: 'menu',

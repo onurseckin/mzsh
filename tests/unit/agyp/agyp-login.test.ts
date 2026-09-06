@@ -58,7 +58,7 @@ describe('agyp login keeps every sign-in', () => {
     const result = await invoke(harness.cli, ['login']);
     expect(result.code).toBe(1);
     expect(result.err).toContain('agyp claim');
-    expect(harness.keychain.readMirror(harness.paths.realKeychain, PENDING_MIRROR_ACCOUNT)).toBe(
+    expect(harness.keychain.readMirror(harness.paths.backupKeychain, PENDING_MIRROR_ACCOUNT)).toBe(
       'fresh-credential'
     );
     expect(harness.vault.listAccounts()).toHaveLength(0);
@@ -77,7 +77,7 @@ describe('agyp login keeps every sign-in', () => {
       harness.keychain.readCredential(harness.paths.shadowKeychain('person@example.com'))
     ).toBe('fresh-credential');
     expect(
-      harness.keychain.readMirror(harness.paths.realKeychain, PENDING_MIRROR_ACCOUNT)
+      harness.keychain.readMirror(harness.paths.backupKeychain, PENDING_MIRROR_ACCOUNT)
     ).toBeNull();
   });
 

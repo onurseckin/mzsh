@@ -4,6 +4,7 @@ import { AgypPaths } from '../../../src/domain/agyp/agyp-paths';
 import { AgypVault } from '../../../src/domain/agyp/agyp-vault';
 import type { LiveSession, QuotaSnapshot } from '../../../src/domain/agyp/agyp-types';
 import { AgypKeychain } from '../../../src/infrastructure/agyp/agyp-keychain';
+import { AgypBackups } from '../../../src/infrastructure/agyp/agyp-backups';
 import { AgypProvisioning } from '../../../src/infrastructure/agyp/agyp-provisioning';
 import { AgypQuotaProbe } from '../../../src/infrastructure/agyp/agyp-quota-probe';
 import { AgypService } from '../../../src/infrastructure/agyp/agyp-service';
@@ -60,6 +61,7 @@ export interface Harness {
   probe: StubProbe;
   keychain: AgypKeychain;
   shadow: AgypShadowHome;
+  backups: AgypBackups;
 }
 
 export function buildHarness(agyBinary?: string): Harness {
@@ -68,10 +70,11 @@ export function buildHarness(agyBinary?: string): Harness {
   const keychain = new AgypKeychain(fakeSecurity);
   const shadow = new AgypShadowHome(paths, keychain);
   const probe = new StubProbe();
+  const backups = new AgypBackups(paths, keychain);
   const provisioning =
     agyBinary === undefined
       ? undefined
-      : new AgypProvisioning(paths, vault, keychain, shadow, probe, agyBinary);
+      : new AgypProvisioning(paths, vault, keychain, shadow, probe, backups, agyBinary);
   const service = new AgypService({
     paths,
     vault,
@@ -79,8 +82,9 @@ export function buildHarness(agyBinary?: string): Harness {
     shadowHome: shadow,
     probe,
     provisioning,
+    backups,
   });
-  return { cli: new AgypCli(service), service, vault, paths, probe, keychain, shadow };
+  return { cli: new AgypCli(service), service, vault, paths, probe, keychain, shadow, backups };
 }
 
 export interface Captured {

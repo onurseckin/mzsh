@@ -13,7 +13,7 @@ default_keychain_file="${HOME}/Library/Preferences/default-keychain"
 
 # Items are keyed by service so the gemini credential and agyp's own backup
 # copy can live in one keychain without colliding.
-item_file() { printf '%s.items.%s' "$1" "${2:-gemini}"; }
+item_file() { printf '%s.items.%s.%s' "$1" "${2:-gemini}" "${3:-antigravity}"; }
 
 case "$command" in
   create-keychain)
@@ -59,27 +59,27 @@ case "$command" in
     fi
     ;;
   add-generic-password)
-    blob=""; keychain=""; service="gemini"
+    blob=""; keychain=""; service="gemini"; account="antigravity"
     while [[ $# -gt 0 ]]; do
       case "$1" in
         -U) shift ;;
         -s) service="$2"; shift 2 ;;
-        -a) shift 2 ;;
+        -a) account="$2"; shift 2 ;;
         -w) blob="$2"; shift 2 ;;
         *) keychain="$1"; shift ;;
       esac
     done
     [[ -n "$keychain" ]] || exit 1
     [[ -f "$keychain.locked" ]] && exit 51
-    printf '%s' "$blob" > "$(item_file "$keychain" "$service")"
+    printf '%s' "$blob" > "$(item_file "$keychain" "$service" "$account")"
     ;;
   find-generic-password)
-    keychain=""; service="gemini"
+    keychain=""; service="gemini"; account="antigravity"
     while [[ $# -gt 0 ]]; do
       case "$1" in
         -w) shift ;;
         -s) service="$2"; shift 2 ;;
-        -a) shift 2 ;;
+        -a) account="$2"; shift 2 ;;
         *) keychain="$1"; shift ;;
       esac
     done
@@ -87,23 +87,24 @@ case "$command" in
       [[ -f "$search_list" ]] || exit 44
       while read -r line; do
         candidate="${line//[\" ]/}"
-        if [[ -s "$(item_file "$candidate" "$service")" ]]; then
-          cat "$(item_file "$candidate" "$service")"; exit 0
+        if [[ -s "$(item_file "$candidate" "$service" "$account")" ]]; then
+          cat "$(item_file "$candidate" "$service" "$account")"; exit 0
         fi
       done < "$search_list"
       exit 44
     fi
     [[ -f "$keychain.locked" ]] && exit 51
-    [[ -s "$(item_file "$keychain" "$service")" ]] || exit 44
-    cat "$(item_file "$keychain" "$service")"
+    [[ -s "$(item_file "$keychain" "$service" "$account")" ]] || exit 44
+    cat "$(item_file "$keychain" "$service" "$account")"
     ;;
   delete-generic-password)
-    keychain="${!#}"; service="gemini"
+    keychain="${!#}"; service="gemini"; account="antigravity"
     for ((i=1; i<=$#; i++)); do
       [[ "${!i}" == "-s" ]] && { j=$((i+1)); service="${!j}"; }
+      [[ "${!i}" == "-a" ]] && { j=$((i+1)); account="${!j}"; }
     done
-    [[ -f "$(item_file "$keychain" "$service")" ]] || exit 44
-    rm -f "$(item_file "$keychain" "$service")"
+    [[ -f "$(item_file "$keychain" "$service" "$account")" ]] || exit 44
+    rm -f "$(item_file "$keychain" "$service" "$account")"
     ;;
   *)
     exit 1

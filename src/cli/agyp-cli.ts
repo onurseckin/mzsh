@@ -64,6 +64,7 @@ export class AgypCli {
       refresh: flags.get('--refresh') === true,
       cached,
       minimum: minimum.value,
+      repair: flags.get('--repair') === true,
     });
     return this.emit(command.name, outcome, wantsJson);
   }
@@ -71,7 +72,7 @@ export class AgypCli {
   private async dispatch(
     command: AgypCommandSpec,
     argument: string | undefined,
-    options: { refresh: boolean; cached: boolean; minimum?: number }
+    options: { refresh: boolean; cached: boolean; minimum?: number; repair: boolean }
   ): Promise<CommandOutcome> {
     switch (command.name) {
       case 'use':
@@ -99,7 +100,7 @@ export class AgypCli {
       case 'logout':
         return this.handlers.logout(argument ?? '');
       case 'doctor':
-        return this.handlers.doctor();
+        return this.handlers.doctor(options.repair);
       case 'menu':
         return this.menu();
       default:

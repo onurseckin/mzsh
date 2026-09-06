@@ -1,6 +1,7 @@
 import type { AgypResult } from '../domain/agyp/agyp-types';
 import { AgypService } from '../infrastructure/agyp/agyp-service';
 import type { AccountQuota } from '../infrastructure/agyp/agyp-quota-service';
+import { AgypRecovery } from '../infrastructure/agyp/agyp-recovery';
 import { AgypInteractive } from './agyp-interactive';
 import {
   renderJson,
@@ -223,9 +224,10 @@ export class AgypHandlers {
     });
   }
 
-  public async doctor(): Promise<CommandOutcome> {
+  public async doctor(repair: boolean): Promise<CommandOutcome> {
     const scope = this.service.readScope();
     const sessions = await this.service.quota.discoverLiveSessions();
+    const repairs = repair ? this.service.repairAccounts() : [];
     const health = this.service.inspectAccounts();
 
     const lines = [
@@ -250,10 +252,14 @@ export class AgypHandlers {
       if (entry.credentialExpiry !== null) {
         lines.push(`    refreshed until ${entry.credentialExpiry}`);
       }
+      const copies = [
+        entry.backups.store ? 'agyp store' : null,
+        entry.backups.login ? 'login keychain' : null,
+      ].filter((copy): copy is string => copy !== null);
       lines.push(
-        entry.hasMirror
-          ? '    backup    in login keychain'
-          : '    backup    NONE — this sign-in cannot be recovered if its keychain is re-keyed'
+        copies.length > 0
+          ? `    copies    ${copies.join(' + ')}`
+          : '    copies    NONE — nothing to recover from if this sandbox is lost'
       );
       if (!entry.sandboxReady) {
         lines.push('    sandbox missing — it is rebuilt on the next `agyp use`');
@@ -263,16 +269,31 @@ export class AgypHandlers {
       }
     }
 
+    if (repairs.length > 0) {
+      lines.push('', 'repairs');
+      for (const step of repairs) {
+        lines.push(`  ${step.email.padEnd(32)} ${step.action}`);
+      }
+    } else if (repair) {
+      lines.push('', 'repairs', '  nothing needed — every account is whole');
+    } else if (AgypRecovery.needsRepair(health)) {
+      lines.push('', 'run `agyp doctor --repair` to restore missing sign-ins and complete copies');
+    }
+    lines.push('', `backup store  ${this.service.paths.backupKeychain}`);
+
     return {
       exitCode: 0,
       text: lines.join('\n'),
       json: {
         vault: this.service.paths.vaultRoot,
+        backupStore: this.service.paths.backupKeychain,
         keychainMode: this.service.layered ? 'layered' : 'strict',
         sessionAccount: scope.sessionAccount,
         globalAccount: scope.globalAccount,
         liveSessions: serializeSessions(sessions),
         accounts: health.map(serializeHealth),
+        needsRepair: AgypRecovery.needsRepair(health),
+        repairs,
       },
     };
   }

@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import type { AgypPaths } from '../../domain/agyp/agyp-paths';
 import { PENDING_MIRROR_ACCOUNT } from '../../domain/agyp/agyp-types';
 import type { AgypVault } from '../../domain/agyp/agyp-vault';
+import type { AgypBackups } from './agyp-backups';
 import type { AgypKeychain } from './agyp-keychain';
 import { AgypShadowHome } from './agyp-shadow-home';
 import type { AgypQuotaProbe } from './agyp-quota-probe';
@@ -31,6 +32,7 @@ export class AgypProvisioning {
   private readonly keychain: AgypKeychain;
   private readonly shadowHome: AgypShadowHome;
   private readonly probe: AgypQuotaProbe;
+  private readonly backups: AgypBackups;
   private readonly agyBinary: string;
 
   constructor(
@@ -39,6 +41,7 @@ export class AgypProvisioning {
     keychain: AgypKeychain,
     shadowHome: AgypShadowHome,
     probe: AgypQuotaProbe,
+    backups: AgypBackups,
     agyBinary = 'agy'
   ) {
     this.paths = paths;
@@ -46,6 +49,7 @@ export class AgypProvisioning {
     this.keychain = keychain;
     this.shadowHome = shadowHome;
     this.probe = probe;
+    this.backups = backups;
     this.agyBinary = agyBinary;
   }
 
@@ -145,9 +149,9 @@ export class AgypProvisioning {
     this.shadowHome.ensure(email, layered);
     const written = this.keychain.writeCredential(this.paths.shadowKeychain(email), blob);
     if (written) {
-      // Best effort: the account works without a mirror, it just could not be
-      // rebuilt if its sandbox keychain is ever re-keyed out from under us.
-      this.keychain.writeMirror(this.paths.realKeychain, email, blob);
+      // Best effort: the account works without copies, it just could not be
+      // rebuilt if its sandbox keychain is ever lost out from under us.
+      this.backups.save(email, blob);
       this.vault.registerAccount(email);
     }
     return written;
@@ -252,10 +256,11 @@ export class AgypProvisioning {
         email = this.paths.canonicalizeEmail(providedEmail);
       }
       if (email === null) {
-        // Keep the sign-in in the login keychain rather than lose it with the
+        // Keep the sign-in in agyp's own store rather than lose it with the
         // staging home. One slot: a newer unidentified sign-in replaces it.
+        this.backups.ensureStore();
         const kept = this.keychain.writeMirror(
-          this.paths.realKeychain,
+          this.paths.backupKeychain,
           PENDING_MIRROR_ACCOUNT,
           blob
         );
@@ -282,7 +287,8 @@ export class AgypProvisioning {
    * cannot file a sign-in under the wrong name.
    */
   public async claim(claimedEmail: string, layered: boolean): Promise<ProvisioningOutcome> {
-    const blob = this.keychain.readMirror(this.paths.realKeychain, PENDING_MIRROR_ACCOUNT);
+    this.backups.ensureStore();
+    const blob = this.keychain.readMirror(this.paths.backupKeychain, PENDING_MIRROR_ACCOUNT);
     if (blob === null) {
       return { success: false, message: 'No unidentified sign-in is waiting to be claimed.' };
     }
@@ -300,12 +306,12 @@ export class AgypProvisioning {
       this.adopt(verified, blob, layered);
       this.vault.removeAccount(claimed);
       this.shadowHome.remove(claimed);
-      this.keychain.deleteMirror(this.paths.realKeychain, claimed);
+      this.backups.forget(claimed);
       email = verified;
       note = ` It authenticates as ${verified}, not ${claimed}, so it was filed under ${verified}.`;
     }
 
-    this.keychain.deleteMirror(this.paths.realKeychain, PENDING_MIRROR_ACCOUNT);
+    this.keychain.deleteMirror(this.paths.backupKeychain, PENDING_MIRROR_ACCOUNT);
     return { success: true, email, message: `Attached the kept sign-in to ${email}.${note}` };
   }
 }

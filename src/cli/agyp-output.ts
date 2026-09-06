@@ -1,5 +1,5 @@
 import type { AccountQuota } from '../infrastructure/agyp/agyp-quota-service';
-import type { AccountHealth } from '../infrastructure/agyp/agyp-service';
+import type { AccountHealth } from '../infrastructure/agyp/agyp-recovery';
 import type { LiveSession, QuotaSnapshot } from '../domain/agyp/agyp-types';
 
 export interface CommandOutcome {
@@ -56,7 +56,8 @@ export function serializeHealth(entry: AccountHealth): Record<string, unknown> {
   return {
     account: entry.email,
     hasStoredSignIn: entry.hasCredential,
-    hasRecoverableBackup: entry.hasMirror,
+    hasRecoverableBackup: entry.backups.store || entry.backups.login,
+    backups: entry.backups,
     keychain: entry.keychainPath,
     credentialExpiry: entry.credentialExpiry,
     sandboxReady: entry.sandboxReady,

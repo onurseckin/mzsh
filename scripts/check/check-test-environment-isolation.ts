@@ -69,7 +69,9 @@ function scan(path: string): Violation[] {
       }
     }
     for (const guarded of GUARDED_CONSTRUCTIONS) {
-      if (text.includes(guarded.construction) && !text.includes(guarded.requires)) {
+      // The call may be wrapped across lines by the formatter.
+      const call = lines.slice(index, index + 10).join(' ');
+      if (text.includes(guarded.construction) && !call.includes(guarded.requires)) {
         violations.push({
           path,
           line: index + 1,

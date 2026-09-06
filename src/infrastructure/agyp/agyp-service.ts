@@ -17,19 +17,12 @@ import { AgypShadowHome } from './agyp-shadow-home';
 import { AgypQuotaProbe } from './agyp-quota-probe';
 import { AgypQuotaService, type AccountQuota } from './agyp-quota-service';
 import { AgypProvisioning } from './agyp-provisioning';
+import { AgypBackups } from './agyp-backups';
+import { AgypRecovery, type AccountHealth, type RepairAction } from './agyp-recovery';
 
 const SESSION_ACCOUNT_VARIABLE = 'AGYP_ACCOUNT';
 
-export interface AccountHealth {
-  email: string;
-  keychainPath: string;
-  hasCredential: boolean;
-  credentialExpiry: string | null;
-  /** Whether a recoverable copy exists in the login keychain. */
-  hasMirror: boolean;
-  sandboxReady: boolean;
-  strayEntries: string[];
-}
+export type { AccountHealth, RepairAction };
 
 export interface AgypServiceDependencies {
   paths?: AgypPaths;
@@ -39,6 +32,7 @@ export interface AgypServiceDependencies {
   probe?: AgypQuotaProbe;
   quota?: AgypQuotaService;
   provisioning?: AgypProvisioning;
+  backups?: AgypBackups;
 }
 
 export class AgypService {
@@ -48,6 +42,8 @@ export class AgypService {
   private readonly keychain: AgypKeychain;
   private readonly shadowHome: AgypShadowHome;
   private readonly provisioning: AgypProvisioning;
+  private readonly backups: AgypBackups;
+  private readonly recovery: AgypRecovery;
 
   constructor(dependencies: AgypServiceDependencies = {}) {
     this.paths = dependencies.paths ?? new AgypPaths();
@@ -57,9 +53,24 @@ export class AgypService {
     const probe = dependencies.probe ?? new AgypQuotaProbe();
     this.quota =
       dependencies.quota ?? new AgypQuotaService(this.paths, this.vault, probe, this.keychain);
+    this.backups = dependencies.backups ?? new AgypBackups(this.paths, this.keychain);
+    this.recovery = new AgypRecovery(
+      this.paths,
+      this.vault,
+      this.keychain,
+      this.shadowHome,
+      this.backups
+    );
     this.provisioning =
       dependencies.provisioning ??
-      new AgypProvisioning(this.paths, this.vault, this.keychain, this.shadowHome, probe);
+      new AgypProvisioning(
+        this.paths,
+        this.vault,
+        this.keychain,
+        this.shadowHome,
+        probe,
+        this.backups
+      );
   }
 
   /**
@@ -104,15 +115,15 @@ export class AgypService {
   }
 
   /**
-   * Puts an account's credential back into a freshly rebuilt sandbox keychain.
-   * Returns false when no mirror exists, which means the sign-in is gone.
+   * Puts an account's credential back into its sandbox keychain from whatever
+   * copy survives. Returns false only when no copy exists anywhere.
    */
-  private restoreFromMirror(email: string): boolean {
-    const blob = this.keychain.readMirror(this.paths.realKeychain, email);
-    if (blob === null) {
-      return false;
-    }
-    return this.keychain.writeCredential(this.paths.shadowKeychain(email), blob);
+  private restoreFromBackups(email: string): boolean {
+    const recovered = this.backups.recover(email);
+    return (
+      recovered !== null &&
+      this.keychain.writeCredential(this.paths.shadowKeychain(email), recovered.blob)
+    );
   }
 
   /** Binds an account to the calling shell by emitting shell assignments. */
@@ -123,22 +134,22 @@ export class AgypService {
     }
     const email = resolved.email;
 
-    const report = this.shadowHome.ensure(email, this.layered);
+    this.shadowHome.ensure(email, this.layered);
     const keychainPath = this.paths.shadowKeychain(email);
-    if (report.keychainRebuilt) {
-      this.restoreFromMirror(email);
-    }
-    if (!this.keychain.hasCredential(keychainPath)) {
+    // A missing credential — rebuilt keychain, wiped sandbox, fresh machine —
+    // is recovered rather than reported whenever a copy exists.
+    if (!this.keychain.hasCredential(keychainPath) && !this.restoreFromBackups(email)) {
       return {
         success: false,
         message: `No stored credential for ${email}. Run \`agyp login\` to sign in again.`,
       };
     }
     this.keychain.unlockKeychain(keychainPath);
-    // Backfills the mirror for accounts adopted before mirroring existed.
+    // Completes the copies for accounts adopted before either backup existed.
     const blob = this.keychain.readCredential(keychainPath);
-    if (blob !== null && this.keychain.readMirror(this.paths.realKeychain, email) === null) {
-      this.keychain.writeMirror(this.paths.realKeychain, email, blob);
+    const copies = this.backups.status(email);
+    if (blob !== null && (!copies.store || !copies.login)) {
+      this.backups.save(email, blob);
     }
     this.vault.touchAccount(email);
 
@@ -217,7 +228,7 @@ export class AgypService {
 
     this.vault.removeAccount(email);
     this.shadowHome.remove(email);
-    this.keychain.deleteMirror(this.paths.realKeychain, email);
+    this.backups.forget(email);
 
     const replacement = this.vault.getGlobalAccount();
     if (wasGlobal && replacement !== null) {
@@ -229,26 +240,12 @@ export class AgypService {
     return { success: true, action: 'print', payload: `Removed ${email}.${suffix}` };
   }
 
-  /**
-   * Confirms every account's credential is actually on disk and readable.
-   *
-   * The sandbox keychain is the only copy of a sign-in, so this is the check
-   * that answers "would I have to log in again?" without having to try it.
-   */
   public inspectAccounts(): AccountHealth[] {
-    return this.vault.listAccounts().map((account) => {
-      const keychainPath = this.paths.shadowKeychain(account.email);
-      const blob = this.keychain.readCredential(keychainPath);
-      return {
-        email: account.email,
-        keychainPath,
-        hasCredential: blob !== null,
-        credentialExpiry: blob === null ? null : AgypKeychain.readCredentialExpiry(blob),
-        hasMirror: this.keychain.readMirror(this.paths.realKeychain, account.email) !== null,
-        sandboxReady: this.shadowHome.exists(account.email),
-        strayEntries: this.shadowHome.strayEntries(account.email),
-      };
-    });
+    return this.recovery.inspect();
+  }
+
+  public repairAccounts(): RepairAction[] {
+    return this.recovery.repair(this.layered);
   }
 
   public static toQuotaViews(entries: readonly AccountQuota[]): AccountQuotaView[] {
