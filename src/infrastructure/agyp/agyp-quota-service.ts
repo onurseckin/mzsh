@@ -47,7 +47,7 @@ export class AgypQuotaService {
     const liveSessions = sessions.filter((session) => session.email === email);
 
     for (const session of liveSessions) {
-      const snapshot = await this.probe.readLiveQuota(session.port);
+      const snapshot = await this.probe.readLiveQuota(session.port, session.csrfToken);
       if (snapshot) {
         this.vault.rememberQuota(snapshot);
         return { email, snapshot, liveSessions };

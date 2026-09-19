@@ -1,5 +1,6 @@
 import { spawn, spawnSync } from 'node:child_process';
 import type { ChildProcess } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { parseUserStatus } from '../../domain/agyp/agyp-quota';
 import type { LiveSession, QuotaSnapshot, QuotaSource } from '../../domain/agyp/agyp-types';
 
@@ -58,13 +59,29 @@ export class AgypQuotaProbe {
     return ports;
   }
 
-  public async fetchUserStatus(port: number): Promise<unknown> {
+  private static extractCsrfToken(pid: number): string | undefined {
+    const result = spawnSync('ps', ['-ww', '-p', String(pid), '-o', 'args='], {
+      encoding: 'utf8',
+    });
+    if (result.status !== 0 || !result.stdout) {
+      return undefined;
+    }
+    const match = /--csrf_token(?:=|\s+)([^\s]+)/.exec(result.stdout);
+    return match?.[1];
+  }
+
+  public async fetchUserStatus(port: number, csrfToken?: string): Promise<unknown> {
     try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      const token = csrfToken ?? process.env.ANTIGRAVITY_CSRF_TOKEN;
+      if (token !== undefined && token.length > 0) {
+        headers['x-codeium-csrf-token'] = token;
+      }
       // The language server presents a self-signed certificate on loopback.
       // `tls` is a Bun-specific fetch option, hence the widened cast.
       const requestOptions = {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: '{}',
         tls: { rejectUnauthorized: false },
         signal: AbortSignal.timeout(STATUS_TIMEOUT_MS),
@@ -91,18 +108,24 @@ export class AgypQuotaProbe {
       if (seenPids.has(candidate.pid)) {
         continue;
       }
-      const payload = await this.fetchUserStatus(candidate.port);
+      const token = AgypQuotaProbe.extractCsrfToken(candidate.pid);
+      const payload = await this.fetchUserStatus(candidate.port, token);
       const snapshot = payload === null ? null : parseUserStatus(payload, 'live_session');
       if (snapshot) {
         seenPids.add(candidate.pid);
-        sessions.push({ pid: candidate.pid, port: candidate.port, email: snapshot.email });
+        sessions.push({
+          pid: candidate.pid,
+          port: candidate.port,
+          email: snapshot.email,
+          ...(token !== undefined ? { csrfToken: token } : {}),
+        });
       }
     }
     return sessions;
   }
 
-  public async readLiveQuota(port: number): Promise<QuotaSnapshot | null> {
-    const payload = await this.fetchUserStatus(port);
+  public async readLiveQuota(port: number, csrfToken?: string): Promise<QuotaSnapshot | null> {
+    const payload = await this.fetchUserStatus(port, csrfToken);
     return payload === null ? null : parseUserStatus(payload, 'live_session');
   }
 
@@ -149,10 +172,11 @@ export class AgypQuotaProbe {
   public async awaitIdentity(
     port: number,
     source: QuotaSource,
-    attempts: number = IDENTITY_POLL_ATTEMPTS
+    attempts: number = IDENTITY_POLL_ATTEMPTS,
+    csrfToken?: string
   ): Promise<QuotaSnapshot | null> {
     for (let attempt = 0; attempt < attempts; attempt += 1) {
-      const payload = await this.fetchUserStatus(port);
+      const payload = await this.fetchUserStatus(port, csrfToken);
       const snapshot = payload === null ? null : parseUserStatus(payload, source);
       if (snapshot) {
         return snapshot;
@@ -170,12 +194,16 @@ export class AgypQuotaProbe {
    * second process afterwards and race its start-up. The last reading wins
    * so a sign-out and sign-in inside the same session is honoured.
    */
-  public async watchSignIn(pid: number, hasExited: () => boolean): Promise<QuotaSnapshot | null> {
+  public async watchSignIn(
+    pid: number,
+    hasExited: () => boolean,
+    csrfToken?: string
+  ): Promise<QuotaSnapshot | null> {
     let latest: QuotaSnapshot | null = null;
     while (!hasExited()) {
       const [port] = AgypQuotaProbe.portsForPid(pid);
       if (port !== undefined) {
-        const payload = await this.fetchUserStatus(port);
+        const payload = await this.fetchUserStatus(port, csrfToken);
         const snapshot = payload === null ? null : parseUserStatus(payload, 'live_session');
         if (snapshot) {
           latest = snapshot;
@@ -195,8 +223,9 @@ export class AgypQuotaProbe {
     const before = new Set(
       AgypQuotaProbe.listListeningPorts().map((entry) => `${entry.pid}:${entry.port}`)
     );
+    const csrfToken = randomUUID();
 
-    const child = spawn(this.agyBinary, ['models'], {
+    const child = spawn(this.agyBinary, ['--csrf_token', csrfToken, 'models'], {
       env: { ...process.env, HOME: shadowHome },
       stdio: 'ignore',
     });
@@ -209,7 +238,12 @@ export class AgypQuotaProbe {
       if (!discovered) {
         return null;
       }
-      return await this.awaitIdentity(discovered.port, 'spawned_probe');
+      return await this.awaitIdentity(
+        discovered.port,
+        'spawned_probe',
+        IDENTITY_POLL_ATTEMPTS,
+        csrfToken
+      );
     } finally {
       AgypQuotaProbe.terminate(child, child.pid ?? null);
     }

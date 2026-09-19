@@ -1,4 +1,5 @@
 import { spawn, type StdioOptions } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { closeSync, existsSync, mkdirSync, openSync, readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import type { AgypPaths } from '../../domain/agyp/agyp-paths';
@@ -220,7 +221,8 @@ export class AgypProvisioning {
       );
       const terminal = AgypProvisioning.openTerminal();
       let exited = false;
-      const child = spawn(this.agyBinary, [], {
+      const csrfToken = randomUUID();
+      const child = spawn(this.agyBinary, ['--csrf_token', csrfToken], {
         stdio: terminal.stdio,
         env: { ...process.env, HOME: staging },
       });
@@ -235,7 +237,7 @@ export class AgypProvisioning {
       const watched =
         child.pid === undefined
           ? Promise.resolve(null)
-          : this.probe.watchSignIn(child.pid, () => exited);
+          : this.probe.watchSignIn(child.pid, () => exited, csrfToken);
       await exit;
       terminal.close();
       const observed = await watched;

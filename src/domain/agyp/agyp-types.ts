@@ -73,6 +73,7 @@ export interface LiveSession {
   pid: number;
   port: number;
   email: string;
+  csrfToken?: string;
 }
 
 export interface AgypEnvironmentExport {

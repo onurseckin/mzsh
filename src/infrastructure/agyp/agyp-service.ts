@@ -1,3 +1,5 @@
+import { spawnSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { AgypPaths } from '../../domain/agyp/agyp-paths';
 import { AgypVault } from '../../domain/agyp/agyp-vault';
 import { formatResetHint } from '../../domain/agyp/agyp-quota';
@@ -171,6 +173,15 @@ export class AgypService {
     }
     const email = resolved.email;
 
+    const currentGlobal = this.vault.getGlobalAccount();
+    if (currentGlobal !== null && currentGlobal !== email) {
+      const activeBlob = this.keychain.readCredential(this.paths.realKeychain);
+      if (activeBlob !== null) {
+        this.keychain.writeCredential(this.paths.shadowKeychain(currentGlobal), activeBlob);
+        this.backups.save(currentGlobal, activeBlob);
+      }
+    }
+
     const blob = this.keychain.readCredential(this.paths.shadowKeychain(email));
     if (blob === null) {
       return { success: false, message: `No stored credential for ${email}.` };
@@ -179,12 +190,28 @@ export class AgypService {
       return { success: false, message: `Could not write ${email} into the login keychain.` };
     }
     this.vault.setGlobalAccount(email);
+    this.invalidateIdeCache();
 
     return {
       success: true,
       action: 'print',
       payload: `Global default is now ${email}. The Antigravity IDE picks this up on its next start.`,
     };
+  }
+
+  private invalidateIdeCache(): void {
+    const query =
+      "DELETE FROM ItemTable WHERE key IN ('antigravityAuthStatus', 'antigravityUnifiedStateSync.oauthToken', 'antigravityUnifiedStateSync.userStatus');";
+    for (const dbPath of this.paths.ideStateDatabases) {
+      if (!existsSync(dbPath)) {
+        continue;
+      }
+      try {
+        spawnSync('sqlite3', [dbPath, query], { encoding: 'utf8' });
+      } catch {
+        // Non-fatal: best-effort invalidation so a missing sqlite3 never crashes syncGlobal.
+      }
+    }
   }
 
   private exportOutcome(outcome: {

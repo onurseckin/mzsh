@@ -1,6 +1,26 @@
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
+function resolveRealHome(explicitHome?: string): string {
+  if (explicitHome !== undefined && explicitHome.trim().length > 0) {
+    return explicitHome;
+  }
+  const envReal = process.env.AGYP_REAL_HOME;
+  if (envReal !== undefined && envReal.trim().length > 0) {
+    return envReal;
+  }
+  const envHome = process.env.HOME;
+  const candidate = envHome !== undefined && envHome.trim().length > 0 ? envHome : homedir();
+  const agypIndex = candidate.indexOf('/.agyp/');
+  if (agypIndex !== -1) {
+    return candidate.slice(0, agypIndex);
+  }
+  if (candidate.endsWith('/.agyp')) {
+    return candidate.slice(0, candidate.length - '/.agyp'.length);
+  }
+  return candidate;
+}
+
 /**
  * On-disk layout of the agyp vault.
  *
@@ -14,9 +34,7 @@ export class AgypPaths {
   public readonly vaultRoot: string;
 
   constructor(realHome?: string, vaultRoot?: string) {
-    const envHome = process.env.HOME;
-    this.realHome =
-      realHome ?? (envHome !== undefined && envHome.trim().length > 0 ? envHome : homedir());
+    this.realHome = resolveRealHome(realHome);
     this.vaultRoot = vaultRoot ?? join(this.realHome, '.agyp');
   }
 
@@ -74,6 +92,16 @@ export class AgypPaths {
 
   public get realKeychain(): string {
     return join(this.realHome, 'Library', 'Keychains', 'login.keychain-db');
+  }
+
+  public get ideStateDatabases(): readonly string[] {
+    const apps = ['Antigravity', 'Antigravity IDE'];
+    const files = ['state.vscdb', 'state.vscdb.backup'];
+    return apps.flatMap((app) =>
+      files.map((file) =>
+        join(this.realHome, 'Library', 'Application Support', app, 'User', 'globalStorage', file)
+      )
+    );
   }
 
   /**

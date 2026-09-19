@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { spawnSync } from 'node:child_process';
 import { mkdirSync, rmSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { buildHarness, fakeHome, invoke, snapshotFor, testRoot } from './agyp-cli-harness';
 
 describe('AgypCli', () => {
@@ -94,6 +95,52 @@ describe('AgypCli', () => {
     expect(result.code).toBe(0);
     expect(vault.getGlobalAccount()).toBe('second@example.com');
     expect(keychain.readCredential(paths.realKeychain)).toBe('second-credential');
+  });
+
+  test('global invalidates Antigravity IDE state caches', async () => {
+    const { cli, vault, paths, keychain, shadow } = buildHarness();
+    vault.registerAccount('first@example.com');
+    vault.registerAccount('second@example.com');
+    shadow.ensure('second@example.com', true);
+    keychain.createKeychain(paths.realKeychain, fakeHome);
+    keychain.writeCredential(paths.shadowKeychain('second@example.com'), 'second-credential');
+
+    const dbPath = paths.ideStateDatabases[0];
+    if (dbPath !== undefined) {
+      mkdirSync(dirname(dbPath), { recursive: true });
+      spawnSync('sqlite3', [
+        dbPath,
+        "CREATE TABLE ItemTable (key TEXT PRIMARY KEY, value TEXT); INSERT INTO ItemTable VALUES ('antigravityAuthStatus', 'old_auth'), ('antigravityUnifiedStateSync.oauthToken', 'old_token'), ('antigravityUnifiedStateSync.userStatus', 'old_user'), ('unrelated', 'keep_me');",
+      ]);
+
+      const result = await invoke(cli, ['global', 'second']);
+      expect(result.code).toBe(0);
+
+      const check = spawnSync('sqlite3', [dbPath, 'SELECT key FROM ItemTable ORDER BY key ASC;'], {
+        encoding: 'utf8',
+      });
+      expect(check.stdout.trim()).toBe('unrelated');
+    }
+  });
+
+  test('global preserves active credential of outgoing global account', async () => {
+    const { cli, vault, paths, keychain, shadow } = buildHarness();
+    vault.registerAccount('first@example.com');
+    vault.registerAccount('second@example.com');
+    vault.setGlobalAccount('first@example.com');
+    shadow.ensure('first@example.com', true);
+    shadow.ensure('second@example.com', true);
+    keychain.createKeychain(paths.realKeychain, fakeHome);
+    keychain.writeCredential(paths.realKeychain, 'refreshed-first-token');
+    keychain.writeCredential(paths.shadowKeychain('second@example.com'), 'second-credential');
+
+    const result = await invoke(cli, ['global', 'second']);
+    expect(result.code).toBe(0);
+    expect(vault.getGlobalAccount()).toBe('second@example.com');
+    expect(keychain.readCredential(paths.realKeychain)).toBe('second-credential');
+    expect(keychain.readCredential(paths.shadowKeychain('first@example.com'))).toBe(
+      'refreshed-first-token'
+    );
   });
 
   test('list marks the shell and global scopes and shows quota', async () => {
