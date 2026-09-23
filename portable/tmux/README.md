@@ -9,7 +9,7 @@
 - **Leader / Prefix**: Configured to `` ` `` (backtick) for ergonomic keyboard access (`bind ` send-prefix`).
 - **Escape Latency**: `set -s escape-time 0` for instantaneous mode-switching and zero keystroke latency.
 - **Pass-through**: `set -g allow-passthrough on` and `extended-keys on` for WezTerm and terminal emulator compatibility.
-- **Detach Protection**: `unbind C-d` to prevent accidental multiplexer detach on rapid Escape or Ctrl-D keystrokes.
+- **Detach Protection & Soft Detach**: `unbind d` and `unbind C-d` to prevent accidental multiplexer detach; `prefix + D` (`Shift+D`) provides safe, intentional soft detachment keeping all sessions running in the background.
 - **1-Based Indexing**: `base-index 1` and `pane-base-index 1` for 1-based keyboard matching.
 - **Pane Splitting**: `v` for vertical split (top/bottom) and `b` for horizontal split (left/right), preserving current working directory (`-c "#{pane_current_path}"`).
 - **Pane Navigation & Resizing**: `Alt + Arrow keys` (root-level), directional selectors (`h/j/k/l`), and repeatable resize keys (`H/J/K/L`).
@@ -19,7 +19,7 @@
 ## Integrated Plugins
 
 - `tpm`: Tmux Plugin Manager (`prefix + I` to install, `prefix + U` to update, `prefix + Alt-u` to clean).
-- `tmux-which-key`: Popup keybinding guidance and categorized chord explorer triggered via `prefix + ?`.
+- `tmux-which-key`: Popup keybinding guidance and categorized chord explorer triggered via `prefix + ?` or `prefix + /`.
 - `tmux-menus`: Interactive popup menu explorer triggered via `prefix + \`.
 - `tmux-fzf`: Interactive fuzzy finder for panes, windows, sessions, and keybindings triggered via `prefix + F`.
 - `tmux-thumbs`: Vimium-style hint jump and copy triggered via `prefix + Space`.
