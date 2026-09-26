@@ -202,6 +202,14 @@ function usesNvm(content: string | undefined): boolean {
   return content !== undefined && /(?:nvm\.sh|NVM_DIR)/.test(content);
 }
 
+function safeRealpath(path: string): string {
+  try {
+    return realpathSync(path);
+  } catch {
+    return path;
+  }
+}
+
 export class EnvironmentProbes {
   constructor(
     private readonly dependencies: EnvironmentProbeDependencies = defaultDependencies()
@@ -275,7 +283,11 @@ export class EnvironmentProbes {
         status: pnpm.status,
         globalBinDiscoverable:
           pnpmGlobalBin.status === 'present' &&
-          pathEntries.some((entry) => entry.path === pnpmGlobalBin.directory),
+          pathEntries.some(
+            (entry) =>
+              entry.path === pnpmGlobalBin.directory ||
+              safeRealpath(entry.path) === safeRealpath(pnpmGlobalBin.directory)
+          ),
       },
       java: { status: javaHome },
       commands,

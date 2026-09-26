@@ -19,11 +19,11 @@ const __dirname: string = dirname(__filename);
 
 // Try to find the built command file
 const possiblePaths: string[] = [
+  // When running from project directory
+  join(__dirname, '..', 'src', 'index.ts'),
   // When installed globally - try lib first (compiled TS), then dist (bundled)
   join(__dirname, '..', 'lib', 'index.js'),
   join(__dirname, '..', 'dist', 'index.js'),
-  // When running from project directory
-  join(__dirname, '..', 'src', 'index.ts'),
 ];
 
 let ZshrcManager: { new (_argv: string[], _config: object): { run(): Promise<void> } };

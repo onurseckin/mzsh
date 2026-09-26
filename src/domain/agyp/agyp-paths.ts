@@ -1,7 +1,7 @@
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-function resolveRealHome(explicitHome?: string): string {
+export function resolveRealHome(explicitHome?: string): string {
   if (explicitHome !== undefined && explicitHome.trim().length > 0) {
     return explicitHome;
   }

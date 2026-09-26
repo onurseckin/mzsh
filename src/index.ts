@@ -22,6 +22,7 @@ import { runMzshCli } from './cli/run-cli';
 import type { RunMzshCliDependencies } from './cli/run-cli';
 import { catalog, renderCatalogUsage } from './catalog/command-catalog';
 import { createCommanderAdapter } from './catalog/commander-adapter';
+import { resolveRealHome } from './domain/agyp/agyp-paths';
 import { resolve } from 'node:path';
 import { join } from 'node:path';
 import { AuthLeaseService } from './application/auth-lease';
@@ -157,12 +158,13 @@ export default class ZshrcManager extends Command {
     try {
       const managedArgs = this.argv || process.argv.slice(2);
       if (isManagedCliRoute(managedArgs)) {
+        const realHome = resolveRealHome();
         process.exitCode = runMzshCli(
           managedArgs,
           createManagedCliDependencies({
-            home: process.env.HOME ?? '/',
-            xdgConfig: process.env.XDG_CONFIG_HOME ?? `${process.env.HOME ?? '/'}/.config`,
-            xdgCache: process.env.XDG_CACHE_HOME ?? `${process.env.HOME ?? '/'}/.cache`,
+            home: realHome,
+            xdgConfig: process.env.XDG_CONFIG_HOME ?? `${realHome}/.config`,
+            xdgCache: process.env.XDG_CACHE_HOME ?? `${realHome}/.cache`,
             repositoryRoot: managedRepositoryRoot(__dirname),
             write: (message) => console.log(message),
           })

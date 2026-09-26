@@ -1,4 +1,5 @@
 import type { AgypResult } from '../domain/agyp/agyp-types';
+import { formatResetHint } from '../domain/agyp/agyp-quota';
 import type { AgypService } from '../infrastructure/agyp/agyp-service';
 import type { AccountQuota } from '../infrastructure/agyp/agyp-quota-service';
 import {
@@ -62,12 +63,17 @@ export class AgypInteractive {
 
   /**
    * Reads quota cheaply first, then falls back to starting a throwaway `agy`
-   * only for accounts that have never reported one. A first run therefore pays
-   * the probe cost once instead of on every open.
+   * for accounts that have never reported one or whose cached quota has expired.
    */
   private async collectForDisplay(): Promise<void> {
     await this.collect(false);
-    if (this.quotas.every((entry) => entry.snapshot !== null)) {
+    const needsProbe = this.quotas.some(
+      (entry) =>
+        entry.snapshot === null ||
+        (entry.snapshot.source === 'cache' &&
+          formatResetHint(entry.snapshot.gemini?.resetTime ?? null) === 'due')
+    );
+    if (!needsProbe) {
       return;
     }
     process.stderr.write('\x1b[2;37mReading quota for accounts with no live session...\x1b[0m\n');
