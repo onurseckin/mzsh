@@ -12,6 +12,12 @@ function _agyp_binary() {
     print -r -- "$HOME/.local/bin/agyp"
     return 0
   fi
+  local user_home
+  user_home="$(eval print -r -- ~$USER 2>/dev/null || true)"
+  if [[ -n "$user_home" && -f "$user_home/.local/bin/agyp" ]]; then
+    print -r -- "$user_home/.local/bin/agyp"
+    return 0
+  fi
   if [[ -f "${0:A:h}/../../../bin/agyp.ts" ]]; then
     print -r -- "${0:A:h}/../../../bin/agyp.ts"
     return 0
