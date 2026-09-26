@@ -25,7 +25,7 @@ typeset -A mzsh_seen_plugins
 mzsh_user_plugins=("${plugins[@]}")
 mzsh_requested_plugins=(
   "${mzsh_user_plugins[@]}"
-  aliases alias-finder aws brew bun colored-man-pages colorize command-not-found copyfile copypath docker docker-compose extract gcloud gh git git-auto-fetch history history-substring-search kubectl macos macports minikube nestjs node npm python pip poetry pre-commit postgres redis-cli ssh ssh-agent tmux web-search yarn you-should-use vscode z fzf fzf-tab zsh-autosuggestions zsh-bat zsh-interactive-cd zsh-syntax-highlighting zsh-vi-mode
+  aliases alias-finder aws brew bun colored-man-pages colorize copyfile copypath docker docker-compose extract gcloud gh git git-auto-fetch history history-substring-search kubectl macos macports minikube nestjs node npm python pip poetry pre-commit postgres redis-cli ssh ssh-agent tmux web-search yarn you-should-use vscode z fzf fzf-tab zsh-autosuggestions zsh-bat zsh-interactive-cd zsh-syntax-highlighting zsh-vi-mode
 )
 mzsh_available_plugins=()
 typeset mzsh_custom_plugins="$ZSH_CUSTOM/plugins"
@@ -65,6 +65,8 @@ source "$ZSH/oh-my-zsh.sh" || {
   unset mzsh_module_directory mzsh_omz_root mzsh_user_plugins mzsh_requested_plugins mzsh_available_plugins mzsh_seen_plugins mzsh_plugin mzsh_custom_plugins mzsh_custom_themes
   return 1
 }
+
+unset -f command_not_found_handler homebrew_command_not_found_handle 2>/dev/null || true
 
 if [[ -r "$HOME/.p10k.zsh" ]]; then
   source "$HOME/.p10k.zsh"

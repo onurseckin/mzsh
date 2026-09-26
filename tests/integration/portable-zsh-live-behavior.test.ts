@@ -214,6 +214,31 @@ describe('portable interactive behavior modules', () => {
     expect(output(result)).toContain('LOADED=1\n');
   });
 
+  test('unsets slow command-not-found handlers so missing commands fail instantaneously without delay', () => {
+    const root = fixture();
+    const framework = join(root, 'omz');
+    mkdirSync(framework, { recursive: true });
+    writeFileSync(
+      join(framework, 'oh-my-zsh.sh'),
+      'command_not_found_handler() { return 99 }\nhomebrew_command_not_found_handle() { return 98 }\n'
+    );
+
+    const result = runInteractive(
+      root,
+      [
+        `source ${JSON.stringify(join(modulesRoot, 'oh-my-zsh.zsh'))}`,
+        'print -r -- "HANDLERS=${+functions[command_not_found_handler]}:${+functions[homebrew_command_not_found_handle]}"',
+      ].join('\n'),
+      {
+        MZSH_OH_MY_ZSH_ROOT: framework,
+      }
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(errors(result)).toBe('');
+    expect(output(result)).toContain('HANDLERS=0:0\n');
+  });
+
   test('resolves custom and core themes, handling subdirectories and empty theme fallback', () => {
     const root = fixture();
     const framework = join(root, 'omz');
