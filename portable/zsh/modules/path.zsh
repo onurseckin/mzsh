@@ -75,4 +75,7 @@ function mzsh_path_finalize() {
 }
 
 [[ -n ${MZSH_COMMAND_SHIM_DIR:-} ]] && mzsh_path_add_shim "$MZSH_COMMAND_SHIM_DIR"
+# User-installed executables (agy, agyp, mzsh) live here; without it they vanish
+# as soon as no ancestor process happens to carry the directory in PATH.
+mzsh_path_add_application "$HOME/.local/bin"
 return 0
